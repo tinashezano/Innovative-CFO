@@ -223,6 +223,19 @@ process for the daily job.
 > `APP_URL` matters: it builds the booking and proposal links that get emailed
 > to prospects, so it has to be the address they can actually reach.
 
+### Turning sign-in off for a demo
+
+Set `AUTH_DISABLED=true` and redeploy. The app then opens straight onto the
+dashboard, treating every visitor as the owner, with a banner across the top so
+it is never a surprise. `/api/health` reports it too.
+
+There is no account to create and no password to remember — handy when you want
+to click around, or show someone the app without handing over credentials.
+
+**Anyone with the URL has full access, including Settings.** Remove the variable
+and redeploy before real client information goes anywhere near it. Removing it
+restores sign-in immediately; nothing else changes.
+
 ### If a deployment will not let you sign in
 
 Open **`https://your-app/api/health`**. It reports, without exposing any secret:

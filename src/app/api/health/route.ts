@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/db';
+import { authDisabled } from '@/lib/auth';
 import { DATABASE_URL_VARS, resolveDatabaseUrl } from '@/lib/database-url';
 
 export const dynamic = 'force-dynamic';
@@ -14,9 +15,27 @@ export const dynamic = 'force-dynamic';
 export async function GET() {
   const checks: { name: string; ok: boolean; detail: string; fix?: string }[] = [];
 
+  // --- Sign-in bypass ---
+  if (authDisabled()) {
+    checks.push({
+      name: 'Sign-in',
+      ok: false,
+      detail: 'SWITCHED OFF — anyone with this URL has full access as the owner',
+      fix: 'Remove AUTH_DISABLED from your environment variables and redeploy once you are done testing.',
+    });
+  }
+
   // --- AUTH_SECRET ---
   const authSecret = process.env.AUTH_SECRET ?? '';
-  if (!authSecret) {
+  if (authDisabled()) {
+    // Sessions are not being signed while the bypass is on, so a missing
+    // secret is not what is stopping anyone getting in.
+    checks.push({
+      name: 'AUTH_SECRET',
+      ok: true,
+      detail: authSecret ? `set (${authSecret.length} characters)` : 'not needed while sign-in is off',
+    });
+  } else if (!authSecret) {
     checks.push({
       name: 'AUTH_SECRET',
       ok: false,
@@ -136,15 +155,22 @@ export async function GET() {
   const problems = checks.filter((c) => !c.ok);
   const healthy = problems.length === 0;
 
+  // The bypass is reported as a problem so it keeps nagging, but it is a
+  // deliberate choice rather than a broken deployment — say so, and do not
+  // return 503 for it alone.
+  const bypassOnly = authDisabled() && problems.length === 1 && problems[0]?.name === 'Sign-in';
+
   return NextResponse.json(
     {
-      status: healthy ? 'ok' : 'needs attention',
+      status: healthy ? 'ok' : bypassOnly ? 'ok, but wide open' : 'needs attention',
       summary: healthy
         ? 'Everything checks out. You should be able to sign in.'
-        : `${problems.length} thing${problems.length === 1 ? '' : 's'} to fix before sign-in will work.`,
+        : bypassOnly
+          ? 'The app is working, but sign-in is switched off — anyone with this URL has full access.'
+          : `${problems.length} thing${problems.length === 1 ? '' : 's'} to fix before the app will work.`,
       checks,
       nextSteps: problems.map((p) => p.fix).filter(Boolean),
     },
-    { status: healthy ? 200 : 503 },
+    { status: healthy || bypassOnly ? 200 : 503 },
   );
 }

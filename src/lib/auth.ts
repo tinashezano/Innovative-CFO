@@ -1,4 +1,5 @@
 import 'server-only';
+import crypto from 'node:crypto';
 import { cookies } from 'next/headers';
 import { redirect } from 'next/navigation';
 import { SignJWT, jwtVerify } from 'jose';
@@ -57,8 +58,69 @@ export async function destroySession(): Promise<void> {
   store.delete(COOKIE_NAME);
 }
 
+/**
+ * True when sign-in has been switched off with AUTH_DISABLED=true.
+ *
+ * For demos and testing only. Every visitor is treated as the owner, so a
+ * publicly reachable deployment with this on is wide open to anyone holding
+ * the link. It defaults to off and has to be turned on deliberately.
+ */
+export function authDisabled(): boolean {
+  return process.env.AUTH_DISABLED === 'true';
+}
+
+/**
+ * The identity everyone shares while AUTH_DISABLED is on: the existing owner
+ * where there is one, otherwise any active user, otherwise a demo owner created
+ * once so the app has someone to attribute work to.
+ */
+async function bypassUser(): Promise<SessionUser | null> {
+  const existing =
+    (await prisma.user.findFirst({
+      where: { active: true, role: 'OWNER' },
+      orderBy: { createdAt: 'asc' },
+      select: { id: true, email: true, name: true, role: true },
+    })) ??
+    (await prisma.user.findFirst({
+      where: { active: true },
+      orderBy: { createdAt: 'asc' },
+      select: { id: true, email: true, name: true, role: true },
+    }));
+
+  if (existing) {
+    return { id: existing.id, email: existing.email, name: existing.name, role: existing.role as Role };
+  }
+
+  // Empty database: create one owner so the app is usable, rather than failing
+  // in a way that looks like the bypass itself is broken. The password hash is
+  // random and never shown, so this account cannot be signed into once the
+  // bypass is lifted — set a real password with `npm run set-password`.
+  const created = await prisma.user.upsert({
+    where: { email: 'demo@innovativecfo.local' },
+    update: {},
+    create: {
+      email: 'demo@innovativecfo.local',
+      name: 'Demo User',
+      passwordHash: await hashPassword(crypto.randomBytes(32).toString('hex')),
+      role: 'OWNER',
+      jobTitle: 'Owner',
+    },
+    select: { id: true, email: true, name: true, role: true },
+  });
+
+  return { id: created.id, email: created.email, name: created.name, role: created.role as Role };
+}
+
 /** Returns the signed-in user, or null. Never throws. */
 export async function getSessionUser(): Promise<SessionUser | null> {
+  if (authDisabled()) {
+    try {
+      return await bypassUser();
+    } catch {
+      return null;
+    }
+  }
+
   try {
     const store = await cookies();
     const token = store.get(COOKIE_NAME)?.value;
