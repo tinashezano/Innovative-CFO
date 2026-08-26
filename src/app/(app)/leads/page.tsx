@@ -3,6 +3,7 @@ import { prisma } from '@/lib/db';
 import { requirePageUser } from '@/lib/auth';
 import { getSettings } from '@/lib/settings';
 import { PageHeader } from '@/components/ui';
+import { formatMoney } from '@/lib/utils';
 import { LeadsBoard } from './leads-board';
 import { LeadsList } from './leads-list';
 import { NewLeadButton } from './new-lead';
@@ -80,7 +81,7 @@ export default async function LeadsPage({
     <>
       <PageHeader
         title="Leads"
-        subtitle={`${leads.length} lead${leads.length === 1 ? '' : 's'} · ${settings.defaultCurrency} ${total.toLocaleString('en-ZA')} estimated pipeline`}
+        subtitle={`${leads.length} lead${leads.length === 1 ? '' : 's'} · ${formatMoney(total, settings.defaultCurrency)} estimated pipeline`}
         actions={
           <>
             <div className="flex rounded-lg border border-slate-300 bg-white p-0.5" role="tablist">

@@ -2,6 +2,7 @@ import { z } from 'zod';
 import { prisma } from '@/lib/db';
 import { requireUser } from '@/lib/auth';
 import { handler, ok, toDate } from '@/lib/api';
+import { formatDate } from '@/lib/utils';
 import { scheduleReminders } from '@/lib/tasks';
 import { notify } from '@/lib/notify';
 import { TASK_CATEGORIES, TASK_PRIORITIES, TASK_STATUSES } from '@/lib/constants';
@@ -68,7 +69,7 @@ export const PATCH = handler(async (request: Request, ctx: { params: Promise<{ i
     await notify({
       userId: fields.assigneeId,
       title: `Task assigned to you: ${task.title}`,
-      body: task.dueDate ? `Due ${task.dueDate.toLocaleDateString('en-ZA')}` : undefined,
+      body: task.dueDate ? `Due ${formatDate(task.dueDate)}` : undefined,
       link: `/tasks/${task.id}`,
       kind: 'ACTION',
     });

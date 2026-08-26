@@ -1,6 +1,6 @@
 import 'server-only';
 import { prisma, nextReference } from './db';
-import { addDays, appUrl, parseJson, randomToken } from './utils';
+import { addDays, appUrl, formatDateTime, parseJson, randomToken } from './utils';
 import { getSettings } from './settings';
 import { sendEmail } from './email';
 import {
@@ -282,7 +282,7 @@ export async function confirmBooking(input: {
       recipientName: lead.owner.name,
       title: `Discovery call booked — ${lead.companyName}`,
       lines: [
-        `${lead.contactName} booked ${input.scheduledAt.toLocaleString('en-ZA')}`,
+        `${lead.contactName} booked ${formatDateTime(input.scheduledAt)}`,
         `${lead.email}${lead.phone ? ` · ${lead.phone}` : ''}`,
         input.agenda ? `Agenda: ${input.agenda}` : 'No agenda supplied',
       ],
@@ -306,7 +306,7 @@ export async function confirmBooking(input: {
   await notify({
     userId: lead.ownerId,
     title: `Discovery call booked — ${lead.companyName}`,
-    body: input.scheduledAt.toLocaleString('en-ZA'),
+    body: formatDateTime(input.scheduledAt),
     link: `/leads/${lead.id}`,
     kind: 'ACTION',
   });

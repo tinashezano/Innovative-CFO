@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { CalendarClock, FileText } from 'lucide-react';
 import { Avatar } from '@/components/ui';
-import { formatMoney, cn } from '@/lib/utils';
+import { formatMoney, formatDayMonth, cn } from '@/lib/utils';
 import { LEAD_STAGE_LABELS, type LeadStage } from '@/lib/constants';
 import { submitJson } from '@/components/forms';
 
@@ -152,10 +152,7 @@ export function LeadsBoard({ leads, stages }: { leads: BoardLead[]; stages: stri
                         {lead.nextCall ? (
                           <span className="inline-flex items-center gap-1">
                             <CalendarClock className="h-3 w-3" aria-hidden />
-                            {new Date(lead.nextCall).toLocaleDateString('en-ZA', {
-                              day: '2-digit',
-                              month: 'short',
-                            })}
+                            {formatDayMonth(lead.nextCall)}
                           </span>
                         ) : null}
                         {lead.proposalCount > 0 ? (

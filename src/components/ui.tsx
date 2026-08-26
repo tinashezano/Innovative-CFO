@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import { cn } from '@/lib/utils';
+import { cn, formatDayMonth } from '@/lib/utils';
 import {
   LEAD_STAGE_LABELS,
   ONBOARDING_STAGE_LABELS,
@@ -229,7 +229,7 @@ export function DueDate({ date, done }: { date: Date | string | null | undefined
           ? 'text-amber-600'
           : 'text-slate-500';
 
-  const label = d.toLocaleDateString('en-ZA', { day: '2-digit', month: 'short' });
+  const label = formatDayMonth(d);
   const suffix = done ? '' : diff < 0 ? ` · ${Math.abs(diff)}d overdue` : diff === 0 ? ' · today' : '';
 
   return (

@@ -4,7 +4,7 @@ import { useMemo, useState } from 'react';
 import Link from 'next/link';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { Avatar } from '@/components/ui';
-import { addDays, cn, formatDate, isoDate, startOfDay } from '@/lib/utils';
+import { addDays, cn, formatDate, formatMonthShortYear, isoDate, startOfDay } from '@/lib/utils';
 import type { TaskRow } from '../types';
 
 const PRIORITY_BAR: Record<string, string> = {
@@ -96,7 +96,7 @@ export function TaskTimelineView({ tasks }: { tasks: TaskRow[] }) {
   // Month header segments across the window.
   const months: { label: string; span: number }[] = [];
   for (const day of days) {
-    const label = day.toLocaleDateString('en-ZA', { month: 'short', year: '2-digit' });
+    const label = formatMonthShortYear(day);
     const last = months.at(-1);
     if (last && last.label === label) last.span += 1;
     else months.push({ label, span: 1 });
@@ -242,23 +242,50 @@ export function TaskTimelineView({ tasks }: { tasks: TaskRow[] }) {
                       </div>
 
                       {placement ? (
-                        <Link
-                          href={`/tasks/${task.id}`}
-                          title={`${task.title} · ${formatDate(task.startDate ?? task.dueDate)} → ${formatDate(task.dueDate)}`}
-                          className={cn(
-                            'absolute top-1.5 flex h-[22px] items-center gap-1 px-1.5 text-[10px] font-medium text-white shadow-sm transition hover:brightness-110',
-                            task.status === 'DONE' ? 'bg-emerald-500' : (PRIORITY_BAR[task.priority] ?? 'bg-slate-400'),
-                            overdue && 'ring-2 ring-red-300',
-                            placement.clippedStart ? 'rounded-l-none' : 'rounded-l',
-                            placement.clippedEnd ? 'rounded-r-none' : 'rounded-r',
-                          )}
-                          style={{
-                            left: placement.offset * dayWidth + 1,
-                            width: placement.span * dayWidth - 2,
-                          }}
-                        >
-                          <span className="truncate">{task.title}</span>
-                        </Link>
+                        (() => {
+                          // A one- or two-day bar is too narrow to hold its own
+                          // title, so the label sits alongside it instead of
+                          // being truncated to nothing useful.
+                          const narrow = placement.span < 4;
+                          const barLeft = placement.offset * dayWidth + 1;
+                          const barWidth = placement.span * dayWidth - 2;
+                          const labelFitsRight = barLeft + barWidth + 120 < gridWidth;
+
+                          return (
+                            <Link
+                              href={`/tasks/${task.id}`}
+                              title={`${task.title} · ${formatDate(task.startDate ?? task.dueDate)} → ${formatDate(task.dueDate)}`}
+                              className="absolute top-1.5 flex h-[22px] items-center"
+                              style={
+                                narrow
+                                  ? labelFitsRight
+                                    ? { left: barLeft }
+                                    : { left: Math.max(0, barLeft - 118), flexDirection: 'row-reverse' }
+                                  : { left: barLeft, width: barWidth }
+                              }
+                            >
+                              <span
+                                className={cn(
+                                  'flex h-[22px] shrink-0 items-center px-1.5 text-[10px] font-medium text-white shadow-sm transition hover:brightness-110',
+                                  task.status === 'DONE'
+                                    ? 'bg-emerald-500'
+                                    : (PRIORITY_BAR[task.priority] ?? 'bg-slate-400'),
+                                  overdue && 'ring-2 ring-red-300',
+                                  placement.clippedStart ? 'rounded-l-none' : 'rounded-l',
+                                  placement.clippedEnd ? 'rounded-r-none' : 'rounded-r',
+                                )}
+                                style={{ width: barWidth }}
+                              >
+                                {!narrow ? <span className="truncate">{task.title}</span> : null}
+                              </span>
+                              {narrow ? (
+                                <span className="whitespace-nowrap px-1.5 text-[10px] font-medium text-slate-600">
+                                  {task.title.length > 18 ? `${task.title.slice(0, 18)}…` : task.title}
+                                </span>
+                              ) : null}
+                            </Link>
+                          );
+                        })()
                       ) : null}
                     </div>
                   </div>

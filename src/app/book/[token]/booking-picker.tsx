@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { CalendarCheck, CheckCircle2 } from 'lucide-react';
+import { formatLongDateTime, formatLongWeekdayDate, formatTime } from '@/lib/utils';
 
 type Slots = { date: string; times: string[] }[];
 
@@ -56,13 +57,7 @@ export function BookingPicker({
         <CheckCircle2 className="mx-auto mb-4 h-12 w-12 text-emerald-500" aria-hidden />
         <h2 className="text-lg font-bold text-slate-900">You&rsquo;re booked in</h2>
         <p className="mt-2 text-sm text-slate-600">
-          {new Date(confirmed).toLocaleString('en-ZA', {
-            weekday: 'long',
-            day: 'numeric',
-            month: 'long',
-            hour: '2-digit',
-            minute: '2-digit',
-          })}
+          {formatLongDateTime(confirmed)}
           {' · '}
           {durationMins} minutes with {ownerName}
         </p>
@@ -97,11 +92,7 @@ export function BookingPicker({
             {slots.map((day) => (
               <div key={day.date}>
                 <h3 className="mb-2 text-xs font-bold uppercase tracking-wide text-slate-500">
-                  {new Date(day.date).toLocaleDateString('en-ZA', {
-                    weekday: 'long',
-                    day: 'numeric',
-                    month: 'long',
-                  })}
+                  {formatLongWeekdayDate(day.date)}
                 </h3>
                 <div className="flex flex-wrap gap-2">
                   {day.times.map((time) => {
@@ -118,10 +109,7 @@ export function BookingPicker({
                             : 'border-slate-300 bg-white text-slate-700 hover:border-brand-400 hover:bg-brand-50'
                         }`}
                       >
-                        {new Date(time).toLocaleTimeString('en-ZA', {
-                          hour: '2-digit',
-                          minute: '2-digit',
-                        })}
+                        {formatTime(time)}
                       </button>
                     );
                   })}

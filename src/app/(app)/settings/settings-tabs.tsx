@@ -6,7 +6,7 @@ import { CheckCircle2, Mail, PlayCircle, RefreshCw, TriangleAlert } from 'lucide
 import { Avatar } from '@/components/ui';
 import { Field, FormError, submitJson } from '@/components/forms';
 import { Modal } from '@/components/modal';
-import { cn, formatDateTime, parseJson } from '@/lib/utils';
+import { cn, formatDateTime, formatMoney, parseJson } from '@/lib/utils';
 import { CURRENCIES, ROLES, ROLE_LABELS, type Role } from '@/lib/constants';
 
 type Settings = {
@@ -506,7 +506,7 @@ export function SettingsTabs({
                   </div>
                   <div className="shrink-0 text-right">
                     <p className="text-sm font-semibold text-slate-900">
-                      {settings.defaultCurrency} {service.defaultPrice.toLocaleString('en-ZA')}
+                      {formatMoney(service.defaultPrice, settings.defaultCurrency)}
                     </p>
                     <p className="text-[11px] text-slate-400">
                       {service.billingCycle.toLowerCase().replace(/_/g, ' ')}

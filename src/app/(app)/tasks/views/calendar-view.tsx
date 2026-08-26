@@ -3,7 +3,7 @@
 import { useMemo, useState } from 'react';
 import Link from 'next/link';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
-import { cn, isoDate, startOfDay } from '@/lib/utils';
+import { cn, formatLongWeekdayDate, formatMonthYear, isoDate, startOfDay } from '@/lib/utils';
 import { TASK_PRIORITY_RANK, type TaskPriority } from '@/lib/constants';
 import type { TaskRow } from '../types';
 
@@ -69,7 +69,7 @@ export function TaskCalendarView({ tasks }: { tasks: TaskRow[] }) {
       <div className="card overflow-hidden">
         <div className="flex items-center justify-between border-b border-slate-200 px-4 py-3">
           <h2 className="text-sm font-semibold text-slate-900">
-            {cursor.toLocaleDateString('en-ZA', { month: 'long', year: 'numeric' })}
+            {formatMonthYear(cursor)}
           </h2>
           <div className="flex items-center gap-1">
             <button
@@ -216,11 +216,7 @@ export function TaskCalendarView({ tasks }: { tasks: TaskRow[] }) {
           />
           <div className="relative z-10 max-h-[70vh] w-full max-w-md overflow-y-auto rounded-xl bg-white p-5 shadow-xl">
             <h2 className="mb-3 text-sm font-semibold text-slate-900">
-              {new Date(`${openDay}T00:00:00`).toLocaleDateString('en-ZA', {
-                weekday: 'long',
-                day: 'numeric',
-                month: 'long',
-              })}
+              {formatLongWeekdayDate(`${openDay}T00:00:00`)}
             </h2>
             <ul className="space-y-1.5">
               {openDayTasks.map((task) => (

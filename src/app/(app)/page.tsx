@@ -3,7 +3,7 @@ import { ArrowRight } from 'lucide-react';
 import { prisma } from '@/lib/db';
 import { requirePageUser } from '@/lib/auth';
 import { getSettings } from '@/lib/settings';
-import { formatMoney, startOfDay, addDays } from '@/lib/utils';
+import { formatMoney, formatDayMonth, formatWeekdayDateTime, startOfDay, addDays } from '@/lib/utils';
 import {
   Avatar,
   DueDate,
@@ -223,14 +223,7 @@ export default async function DashboardPage() {
                         {booking.lead.companyName}
                       </p>
                       <p className="mt-0.5 text-xs text-slate-500">
-                        {booking.scheduledAt.toLocaleString('en-ZA', {
-                          weekday: 'short',
-                          day: '2-digit',
-                          month: 'short',
-                          hour: '2-digit',
-                          minute: '2-digit',
-                        })}{' '}
-                        · {booking.durationMins} min
+                        {formatWeekdayDateTime(booking.scheduledAt)} · {booking.durationMins} min
                       </p>
                     </Link>
                   </li>
@@ -289,7 +282,7 @@ export default async function DashboardPage() {
                       — {activity.body}
                     </p>
                     <p className="mt-0.5 text-[11px] text-slate-400">
-                      {activity.createdAt.toLocaleDateString('en-ZA', { day: '2-digit', month: 'short' })}
+                      {formatDayMonth(activity.createdAt)}
                       {activity.user ? ` · ${activity.user.name}` : ''}
                     </p>
                   </li>

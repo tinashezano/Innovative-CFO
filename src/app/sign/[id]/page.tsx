@@ -1,5 +1,6 @@
 import { notFound } from 'next/navigation';
 import { prisma } from '@/lib/db';
+import { formatDateTime } from '@/lib/utils';
 import { SignPad } from './sign-pad';
 
 export const dynamic = 'force-dynamic';
@@ -42,7 +43,7 @@ export default async function SignPage({ params }: { params: Promise<{ id: strin
               Signed by {envelope.signerName ?? envelope.recipientName}
             </p>
             <p className="mt-0.5 text-xs text-emerald-700">
-              {envelope.signedAt?.toLocaleString('en-ZA')}
+              {formatDateTime(envelope.signedAt)}
             </p>
           </div>
         ) : (
