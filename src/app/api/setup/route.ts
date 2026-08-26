@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { z } from 'zod';
 import { prisma } from '@/lib/db';
 import { createSession, hashPassword } from '@/lib/auth';
-import { nextReference } from '@/lib/db';
+import { usableAccountCount } from '@/lib/bootstrap';
 
 const schema = z.object({
   name: z.string().min(1, 'Enter your name'),
@@ -21,7 +21,7 @@ const schema = z.object({
  */
 export async function POST(request: Request) {
   try {
-    const existing = await prisma.user.count();
+    const existing = await usableAccountCount();
     if (existing > 0) {
       return NextResponse.json(
         { error: 'This app is already set up. Sign in instead.' },
@@ -41,7 +41,7 @@ export async function POST(request: Request) {
     const user = await prisma.$transaction(async (tx) => {
       // Re-check inside the transaction so a concurrent request cannot slip a
       // second owner in behind the first.
-      if ((await tx.user.count()) > 0) throw new Error('ALREADY_SET_UP');
+      if ((await usableAccountCount()) > 0) throw new Error('ALREADY_SET_UP');
 
       return tx.user.create({
         data: {
@@ -85,7 +85,7 @@ export async function POST(request: Request) {
 /** Tells the setup page whether it should still be showing. */
 export async function GET() {
   try {
-    const count = await prisma.user.count();
+    const count = await usableAccountCount();
     return NextResponse.json({ needsSetup: count === 0, users: count });
   } catch {
     return NextResponse.json({ needsSetup: false, error: 'database unreachable' }, { status: 503 });

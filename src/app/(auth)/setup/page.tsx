@@ -1,5 +1,5 @@
 import { redirect } from 'next/navigation';
-import { prisma } from '@/lib/db';
+import { ensureBootstrapOwner, usableAccountCount } from '@/lib/bootstrap';
 import { SetupForm } from './setup-form';
 
 export const dynamic = 'force-dynamic';
@@ -14,7 +14,8 @@ export default async function SetupPage() {
   let databaseError: string | null = null;
 
   try {
-    userCount = await prisma.user.count();
+    await ensureBootstrapOwner();
+    userCount = await usableAccountCount();
   } catch (err) {
     databaseError = err instanceof Error ? err.message.split('\n')[0]! : 'Database unreachable';
   }

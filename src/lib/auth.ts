@@ -6,6 +6,8 @@ import { SignJWT, jwtVerify } from 'jose';
 import bcrypt from 'bcryptjs';
 import { prisma } from './db';
 import { ROLE_RANK, type Role } from './constants';
+import { DEMO_BYPASS_EMAIL } from './bootstrap';
+
 
 const COOKIE_NAME = 'icfo_session';
 const MAX_AGE_SECONDS = 60 * 60 * 24 * 7; // 7 days
@@ -96,10 +98,10 @@ async function bypassUser(): Promise<SessionUser | null> {
   // random and never shown, so this account cannot be signed into once the
   // bypass is lifted — set a real password with `npm run set-password`.
   const created = await prisma.user.upsert({
-    where: { email: 'demo@innovativecfo.local' },
+    where: { email: DEMO_BYPASS_EMAIL },
     update: {},
     create: {
-      email: 'demo@innovativecfo.local',
+      email: DEMO_BYPASS_EMAIL,
       name: 'Demo User',
       passwordHash: await hashPassword(crypto.randomBytes(32).toString('hex')),
       role: 'OWNER',

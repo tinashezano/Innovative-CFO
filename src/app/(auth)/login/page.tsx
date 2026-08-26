@@ -1,6 +1,6 @@
 import { redirect } from 'next/navigation';
 import { getSessionUser } from '@/lib/auth';
-import { prisma } from '@/lib/db';
+import { ensureBootstrapOwner, usableAccountCount } from '@/lib/bootstrap';
 import { LoginForm } from './login-form';
 
 export const dynamic = 'force-dynamic';
@@ -9,12 +9,16 @@ export default async function LoginPage() {
   const user = await getSessionUser();
   if (user) redirect('/');
 
-  // A deployment with no accounts cannot be signed into; send it to first-run
-  // setup rather than showing a form that can only fail. redirect() works by
-  // throwing, so the count is caught separately and the redirect happens after.
+  // A deployment with no usable account cannot be signed into; send it to
+  // first-run setup rather than showing a form that can only fail. redirect()
+  // works by throwing, so the count is caught separately and the redirect
+  // happens after.
   let userCount: number | null = null;
   try {
-    userCount = await prisma.user.count();
+    // Apply OWNER_EMAIL / OWNER_PASSWORD first, so a deployment configured that
+    // way has its account in place before we decide which screen to show.
+    await ensureBootstrapOwner();
+    userCount = await usableAccountCount();
   } catch {
     // Database unreachable — fall through and let the form surface the error.
   }

@@ -223,6 +223,28 @@ process for the daily job.
 > `APP_URL` matters: it builds the booking and proposal links that get emailed
 > to prospects, so it has to be the address they can actually reach.
 
+### Guaranteeing a way in
+
+Set these on your host and the owner account is created — or its password reset
+— on every deploy:
+
+| Variable | Example |
+|---|---|
+| `OWNER_EMAIL` | `you@yourfirm.co.za` |
+| `OWNER_PASSWORD` | a password of your choosing |
+| `OWNER_NAME` | `Your Name` (optional) |
+
+This is the dependable route on a host where running Prisma against the
+production database by hand is awkward, and the way back in if nobody knows the
+password any more: change `OWNER_PASSWORD`, redeploy, and it is reset.
+
+`OWNER_PASSWORD` sits in your host's environment in plain text, so treat it as a
+bootstrap credential — once you are in, remove it and manage people under
+Settings → Team.
+
+`/api/health` lists the addresses you can sign in as, which turns "sign-in
+fails" into "I was typing the wrong email".
+
 ### Turning sign-in off for a demo
 
 Set `AUTH_DISABLED=true` and redeploy. The app then opens straight onto the

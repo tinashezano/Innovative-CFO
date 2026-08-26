@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/db';
 import { authDisabled } from '@/lib/auth';
+import { DEMO_BYPASS_EMAIL, ensureBootstrapOwner } from '@/lib/bootstrap';
 import { DATABASE_URL_VARS, resolveDatabaseUrl } from '@/lib/database-url';
 
 export const dynamic = 'force-dynamic';
@@ -79,6 +80,7 @@ export async function GET() {
   // --- Can we actually reach the database, and are the tables there? ---
   let userCount: number | null = null;
   try {
+    await ensureBootstrapOwner();
     userCount = await prisma.user.count();
     checks.push({ name: 'Database connection', ok: true, detail: 'reachable, schema present' });
   } catch (err) {
@@ -102,18 +104,45 @@ export async function GET() {
     });
   }
 
-  // --- Are there any accounts to sign in with? ---
+  // --- Are there any accounts, and which addresses do they use? ---
   if (userCount !== null) {
-    if (userCount === 0) {
+    // Listing the addresses is what turns "sign-in fails" into "I was typing
+    // the wrong email". No password material is exposed.
+    const accounts = await prisma.user.findMany({
+      where: { active: true },
+      select: { email: true, role: true },
+      orderBy: { createdAt: 'asc' },
+      take: 10,
+    });
+
+    const usable = accounts.filter((a) => a.email !== DEMO_BYPASS_EMAIL);
+
+    if (usable.length === 0) {
       checks.push({
         name: 'Accounts',
         ok: false,
-        detail: 'the database has no users, so no one can sign in',
-        fix: 'Run: DATABASE_URL="<your url>" SEED_PASSWORD="<your password>" npm run db:seed',
+        detail:
+          accounts.length === 0
+            ? 'no accounts yet — open the app and the setup screen will create one'
+            : 'the only account is the AUTH_DISABLED demo user, which has no usable password',
+        fix: 'Open / on this deployment to create an owner account, or set OWNER_EMAIL and OWNER_PASSWORD and redeploy.',
       });
     } else {
-      checks.push({ name: 'Accounts', ok: true, detail: `${userCount} user${userCount === 1 ? '' : 's'}` });
+      checks.push({
+        name: 'Accounts',
+        ok: true,
+        detail: `sign in as: ${usable.map((a) => `${a.email} (${a.role.toLowerCase()})`).join(', ')}`,
+      });
     }
+  }
+
+  // --- Was an owner set from the environment? ---
+  if (process.env.OWNER_EMAIL && process.env.OWNER_PASSWORD) {
+    checks.push({
+      name: 'OWNER_EMAIL',
+      ok: true,
+      detail: `${process.env.OWNER_EMAIL} — password re-applied from OWNER_PASSWORD on each deploy`,
+    });
   }
 
   // --- APP_URL, which builds the links emailed to prospects ---
