@@ -182,8 +182,13 @@ export async function generateRecurringTasks(now = new Date()): Promise<{
       endDate: template.endDate,
     };
 
-    let cursor = template.nextDueAt ?? template.startDate;
-    const horizon = addDays(startOfDay(now), template.leadTimeDays);
+    // Generate forward only. A template that starts in the past (an existing
+    // client migrated in, or one paused for a while) must not backfill last
+    // year's VAT returns — that work either happened or is not ours to raise.
+    const floor = startOfDay(now);
+    const anchor = template.nextDueAt ?? template.startDate;
+    let cursor = anchor > floor ? anchor : floor;
+    const horizon = addDays(floor, template.leadTimeDays);
     let guard = 0;
 
     while (guard < 24) {

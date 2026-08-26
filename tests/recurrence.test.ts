@@ -137,4 +137,18 @@ check('period keys are distinct per period and stable within one', () => {
   assert.equal(periodKeyFor('ANNUAL', d('2026-09-30')), '2026');
 });
 
+
+// --- Regression: forward-only generation ----------------------------------
+// A template whose startDate is months in the past must not backfill; the
+// generator floors its cursor at today. This asserts the rule the generator
+// relies on: asking for the next occurrence from today never looks backwards.
+check('an old start date still yields a future occurrence', () => {
+  const next = nextOccurrence(
+    { frequency: 'MONTHLY', interval: 1, dayOfMonth: 7, startDate: d('2024-01-01') },
+    d('2026-08-26'),
+  );
+  assert.equal(isoDate(next), '2026-09-07');
+  assert.ok(next! >= d('2026-08-26'));
+});
+
 console.log(`\n${passed} assertions passed`);

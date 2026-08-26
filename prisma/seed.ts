@@ -515,7 +515,9 @@ async function main() {
         monthOfYear: t.monthOfYear ?? null,
         leadTimeDays: t.leadTimeDays,
         subtaskTitles: JSON.stringify(t.subtasks),
-        startDate: addDays(now, -365),
+        // Start from today so generation runs forward rather than
+        // backfilling periods that have already been dealt with.
+        startDate: now,
         active: true,
       },
     });
