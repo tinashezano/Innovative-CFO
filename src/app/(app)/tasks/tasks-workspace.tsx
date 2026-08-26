@@ -221,7 +221,7 @@ export function TasksWorkspace({
       ) : currentView === 'timeline' ? (
         <TaskTimelineView tasks={tasks} />
       ) : (
-        <TaskListView tasks={tasks} users={options.users} />
+        <TaskListView tasks={tasks} />
       )}
 
       <NewTaskModal

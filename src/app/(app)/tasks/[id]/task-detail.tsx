@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { Bell, Check, Plus, Trash2 } from 'lucide-react';
 import { Avatar, DueDate, ProgressBar } from '@/components/ui';
-import { Field, FormError, submitJson } from '@/components/forms';
+import { Field, submitJson } from '@/components/forms';
 import { cn, formatDate, formatDateTime, isoDate } from '@/lib/utils';
 import {
   TASK_CATEGORIES,

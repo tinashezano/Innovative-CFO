@@ -3,7 +3,7 @@ import { notFound } from 'next/navigation';
 import { ArrowLeft, Mail, Phone } from 'lucide-react';
 import { prisma } from '@/lib/db';
 import { requirePageUser } from '@/lib/auth';
-import { appUrl, formatDate, formatDateTime, formatMoney } from '@/lib/utils';
+import { appUrl, formatDate, formatMoney } from '@/lib/utils';
 import { Avatar, LeadStageBadge, PageHeader, ProposalStatusBadge } from '@/components/ui';
 import { LeadStageControl } from './stage-control';
 import { BookingPanel } from './booking-panel';
@@ -16,28 +16,21 @@ export default async function LeadDetailPage({ params }: { params: Promise<{ id:
   await requirePageUser();
   const { id } = await params;
 
-  const [lead, users] = await Promise.all([
-    prisma.lead.findUnique({
-      where: { id },
-      include: {
-        owner: true,
-        client: true,
-        activities: { include: { user: true }, orderBy: { createdAt: 'desc' } },
-        bookings: { orderBy: { scheduledAt: 'desc' } },
-        proposals: { orderBy: { createdAt: 'desc' } },
-        tasks: {
-          where: { parentId: null, archivedAt: null },
-          include: { assignee: true },
-          orderBy: { dueDate: 'asc' },
-        },
+  const lead = await prisma.lead.findUnique({
+    where: { id },
+    include: {
+      owner: true,
+      client: true,
+      activities: { include: { user: true }, orderBy: { createdAt: 'desc' } },
+      bookings: { orderBy: { scheduledAt: 'desc' } },
+      proposals: { orderBy: { createdAt: 'desc' } },
+      tasks: {
+        where: { parentId: null, archivedAt: null },
+        include: { assignee: true },
+        orderBy: { dueDate: 'asc' },
       },
-    }),
-    prisma.user.findMany({
-      where: { active: true },
-      select: { id: true, name: true },
-      orderBy: { name: 'asc' },
-    }),
-  ]);
+    },
+  });
 
   if (!lead) notFound();
 

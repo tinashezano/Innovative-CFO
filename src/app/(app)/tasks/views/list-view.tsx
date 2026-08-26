@@ -15,13 +15,7 @@ import type { TaskRow } from '../types';
  * about the work. Subtasks expand inline and can be ticked off without
  * leaving the list.
  */
-export function TaskListView({
-  tasks,
-  users,
-}: {
-  tasks: TaskRow[];
-  users: { id: string; name: string; avatarColor: string }[];
-}) {
+export function TaskListView({ tasks }: { tasks: TaskRow[] }) {
   const router = useRouter();
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set());

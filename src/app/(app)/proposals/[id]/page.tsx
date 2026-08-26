@@ -57,7 +57,6 @@ export default async function ProposalDetailPage({ params }: { params: Promise<{
           <ProposalActions
             proposalId={proposal.id}
             status={proposal.status}
-            publicUrl={publicUrl}
             hasRecipient={Boolean(proposal.lead || proposal.client)}
           />
         }

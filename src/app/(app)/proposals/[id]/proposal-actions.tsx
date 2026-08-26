@@ -8,12 +8,10 @@ import { submitJson } from '@/components/forms';
 export function ProposalActions({
   proposalId,
   status,
-  publicUrl,
   hasRecipient,
 }: {
   proposalId: string;
   status: string;
-  publicUrl: string;
   hasRecipient: boolean;
 }) {
   const router = useRouter();

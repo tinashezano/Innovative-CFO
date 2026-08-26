@@ -3,7 +3,6 @@ import { notFound } from 'next/navigation';
 import { ArrowLeft, Repeat } from 'lucide-react';
 import { prisma } from '@/lib/db';
 import { requirePageUser } from '@/lib/auth';
-import { formatDateTime } from '@/lib/utils';
 import { PageHeader } from '@/components/ui';
 import { TaskDetail } from './task-detail';
 

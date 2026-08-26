@@ -3,15 +3,13 @@ import { ArrowRight } from 'lucide-react';
 import { prisma } from '@/lib/db';
 import { requirePageUser } from '@/lib/auth';
 import { getSettings } from '@/lib/settings';
-import { formatMoney, startOfDay, addDays, cn } from '@/lib/utils';
+import { formatMoney, startOfDay, addDays } from '@/lib/utils';
 import {
   Avatar,
   DueDate,
-  LeadStageBadge,
   OnboardingStageBadge,
   PageHeader,
   PriorityBadge,
-  ProposalStatusBadge,
   StatCard,
 } from '@/components/ui';
 import { LEAD_BOARD_STAGES, LEAD_STAGE_LABELS } from '@/lib/constants';
