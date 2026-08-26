@@ -1,5 +1,6 @@
 import 'server-only';
 import { cookies } from 'next/headers';
+import { redirect } from 'next/navigation';
 import { SignJWT, jwtVerify } from 'jose';
 import bcrypt from 'bcryptjs';
 import { prisma } from './db';
@@ -109,4 +110,14 @@ export class ForbiddenError extends Error {
   constructor() {
     super('You do not have permission to do that');
   }
+}
+
+/**
+ * Page-level guard. Unlike requireUser() this redirects instead of throwing,
+ * so an expired session lands on the login screen rather than an error page.
+ */
+export async function requirePageUser(): Promise<SessionUser> {
+  const user = await getSessionUser();
+  if (!user) redirect('/login');
+  return user;
 }
