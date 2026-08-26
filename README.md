@@ -82,6 +82,12 @@ Four views over the same work, all grouped by client:
 
 ## Get it running
 
+> **`localhost` means your own computer.** Opening `http://localhost:3000`
+> only works once the app is running *on the machine you are browsing from*.
+> If you get `ERR_CONNECTION_REFUSED`, nothing is listening on that port yet —
+> follow Option 1 below, or run `npm run doctor` to see what is missing.
+
+
 ### Option 1 — on your own machine (fastest, ~2 minutes)
 
 Needs [Node 20 or newer](https://nodejs.org). Nothing else — no database to
@@ -101,6 +107,15 @@ Open <http://localhost:3000>.
 is nothing to edit by hand. Re-running it never overwrites secrets you have
 already set.
 
+If anything goes wrong, run:
+
+```bash
+npm run doctor
+```
+
+It checks your Node version, `.env`, dependencies, database and whether port
+3000 is free, and prints the one command that fixes each problem it finds.
+
 | Sign in as | Email | Password |
 |---|---|---|
 | Owner | `admin@innovativecfo.co.za` | `ChangeMe123!` |
@@ -118,17 +133,30 @@ rather than sent.
 
 ### Option 2 — deploy it, so your team can test it
 
+Use this if you would rather not install anything locally, or you want
+colleagues to try it.
+
 Because the app writes to a database, it needs a host with either a durable
 filesystem or a Postgres instance.
 
-**Vercel + any hosted Postgres** (Neon, Supabase, Vercel Postgres):
+**One-click, via Vercel** — this forks the repo, provisions Postgres and
+prompts for the settings it needs:
+
+[![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https%3A%2F%2Fgithub.com%2Ftinashezano%2FInnovative-CFO%2Ftree%2Fclaude%2Faccounting-operations-app-obl5sb&env=AUTH_SECRET,CRON_SECRET,APP_URL&envDescription=AUTH_SECRET%20and%20CRON_SECRET%20are%20long%20random%20strings.%20APP_URL%20is%20your%20deployed%20URL.&project-name=innovative-cfo&repository-name=innovative-cfo&stores=%5B%7B%22type%22%3A%22postgres%22%7D%5D)
+
+Run `npm run use:postgres` and commit **before** deploying, so the schema
+targets Postgres. After the first deploy, create the tables:
 
 ```bash
-npm run use:postgres          # switches the Prisma datasource
-git add -A && git commit -m "Use Postgres"
+DATABASE_URL="<your postgres url>" npx prisma db push
+DATABASE_URL="<your postgres url>" npm run db:seed    # optional demo data
 ```
 
-Then in Vercel: import the repo and set these environment variables —
+**Or set it up by hand:**
+
+With Vercel and any hosted Postgres (Neon, Supabase, Vercel Postgres), run
+`npm run use:postgres`, commit, import the repo, and set these environment
+variables —
 
 | Variable | Value |
 |---|---|
@@ -257,6 +285,7 @@ a TypeScript union rather than a Prisma enum. `npm run use:sqlite` switches back
 | Command | What it does |
 |---|---|
 | `npm run setup` | Write `.env`, create the database, load demo data |
+| `npm run doctor` | Diagnose an install that will not start |
 | `npm run dev` | Development server |
 | `npm run build` / `npm start` | Production build and serve |
 | `npm run db:push` | Apply schema changes |
