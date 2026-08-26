@@ -1,0 +1,566 @@
+// Innovative CFO — Accounting firm operations platform
+//
+// Pipeline: LEAD -> DISCOVERY -> PROPOSAL -> SIGNED + PAID -> ONBOARDING -> TASK MANAGEMENT
+//
+// Default datasource is SQLite so the app runs with zero infrastructure.
+// To move to Postgres: change `provider` to "postgresql" and point DATABASE_URL
+// at your database, then run `npx prisma db push`. No model changes are needed —
+// every status field is a String backed by a TypeScript union in src/lib/constants.ts,
+// which keeps the schema portable across both engines.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+// ---------------------------------------------------------------------------
+// People & access
+// ---------------------------------------------------------------------------
+
+model User {
+  id           String    @id @default(cuid())
+  email        String    @unique
+  name         String
+  passwordHash String
+  role         String    @default("STAFF") // OWNER | MANAGER | STAFF
+  jobTitle     String?
+  phone        String?
+  avatarColor  String    @default("#3564ff")
+  active       Boolean   @default(true)
+  lastLoginAt  DateTime?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  ownedLeads          Lead[]                  @relation("LeadOwner")
+  ownedClients        Client[]                @relation("ClientOwner")
+  ownedOnboardings    Onboarding[]            @relation("OnboardingOwner")
+  assignedTasks       Task[]                  @relation("TaskAssignee")
+  createdTasks        Task[]                  @relation("TaskCreator")
+  templateAssignments RecurringTaskTemplate[] @relation("TemplateAssignee")
+  leadActivities      LeadActivity[]
+  taskComments        TaskComment[]
+  proposals           Proposal[]              @relation("ProposalAuthor")
+  notifications       Notification[]
+  auditLogs           AuditLog[]
+  attachments         Attachment[]
+
+  @@index([role])
+}
+
+// ---------------------------------------------------------------------------
+// 1. Lead & qualification
+// ---------------------------------------------------------------------------
+
+model Lead {
+  id              String    @id @default(cuid())
+  reference       String    @unique // LD-0001
+  companyName     String
+  contactName     String
+  email           String
+  phone           String?
+  source          String    @default("WEBSITE") // WEBSITE | REFERRAL | LINKEDIN | EVENT | COLD_OUTREACH | INBOUND_CALL | OTHER
+  serviceInterest String?
+  estimatedValue  Float     @default(0)
+  currency        String    @default("ZAR")
+  stage           String    @default("NEW") // NEW | DISCOVERY | PROPOSAL | WON | LOST
+  notes           String?
+  lostReason      String?
+  qualifiedAt     DateTime?
+  wonAt           DateTime?
+  lostAt          DateTime?
+  bookingToken    String    @unique // powers the public discovery-call booking link
+  ownerId         String?
+  clientId        String?   @unique
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  owner      User?              @relation("LeadOwner", fields: [ownerId], references: [id], onDelete: SetNull)
+  client     Client?            @relation(fields: [clientId], references: [id], onDelete: SetNull)
+  activities LeadActivity[]
+  bookings   DiscoveryBooking[]
+  proposals  Proposal[]
+  tasks      Task[]
+
+  @@index([stage])
+  @@index([ownerId])
+  @@index([createdAt])
+}
+
+model LeadActivity {
+  id        String   @id @default(cuid())
+  leadId    String
+  userId    String?
+  type      String   @default("NOTE") // NOTE | CALL | EMAIL | MEETING | STAGE_CHANGE | SYSTEM
+  body      String
+  createdAt DateTime @default(now())
+
+  lead Lead  @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  user User? @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([leadId, createdAt])
+}
+
+model DiscoveryBooking {
+  id            String    @id @default(cuid())
+  leadId        String
+  scheduledAt   DateTime
+  durationMins  Int       @default(30)
+  meetingLink   String?
+  location      String?
+  status        String    @default("CONFIRMED") // CONFIRMED | COMPLETED | CANCELLED | NO_SHOW
+  bookedByName  String?
+  bookedByEmail String?
+  agenda        String?
+  outcomeNotes  String?
+  outcome       String? // PROCEED | NOT_A_FIT | FOLLOW_UP
+  completedAt   DateTime?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  lead  Lead   @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  tasks Task[]
+
+  @@index([leadId])
+  @@index([scheduledAt])
+}
+
+// ---------------------------------------------------------------------------
+// 2. Proposal & engagement (DocuSign + Paystack)
+// ---------------------------------------------------------------------------
+
+model Service {
+  id           String  @id @default(cuid())
+  name         String  @unique
+  description  String?
+  defaultPrice Float   @default(0)
+  billingCycle String  @default("MONTHLY") // ONE_OFF | MONTHLY | QUARTERLY | ANNUAL
+  active       Boolean @default(true)
+  sortOrder    Int     @default(0)
+
+  proposalItems ProposalItem[]
+}
+
+model Proposal {
+  id            String    @id @default(cuid())
+  number        String    @unique // PR-0001
+  leadId        String?
+  clientId      String?
+  title         String
+  summary       String?
+  currency      String    @default("ZAR")
+  subtotal      Float     @default(0)
+  discount      Float     @default(0)
+  tax           Float     @default(0)
+  taxRate       Float     @default(0)
+  total         Float     @default(0)
+  // Amount collected up front to activate the engagement (deposit or first month).
+  depositAmount Float     @default(0)
+  status        String    @default("DRAFT") // DRAFT | SENT | VIEWED | ACCEPTED | SIGNED | PAID | DECLINED | EXPIRED
+  publicToken   String    @unique // powers the public proposal / sign / pay page
+  termsHtml     String?
+  scopeHtml     String?
+  validUntil    DateTime?
+  sentAt        DateTime?
+  viewedAt      DateTime?
+  acceptedAt    DateTime?
+  signedAt      DateTime?
+  paidAt        DateTime?
+  declinedAt    DateTime?
+  declineReason String?
+  createdById   String?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  lead      Lead?          @relation(fields: [leadId], references: [id], onDelete: SetNull)
+  client    Client?        @relation(fields: [clientId], references: [id], onDelete: SetNull)
+  createdBy User?          @relation("ProposalAuthor", fields: [createdById], references: [id], onDelete: SetNull)
+  items     ProposalItem[]
+  envelopes Envelope[]
+  payments  Payment[]
+  tasks     Task[]
+
+  @@index([status])
+  @@index([leadId])
+}
+
+model ProposalItem {
+  id           String  @id @default(cuid())
+  proposalId   String
+  serviceId    String?
+  name         String
+  description  String?
+  quantity     Float   @default(1)
+  unitPrice    Float   @default(0)
+  amount       Float   @default(0)
+  billingCycle String  @default("MONTHLY")
+  sortOrder    Int     @default(0)
+
+  proposal Proposal @relation(fields: [proposalId], references: [id], onDelete: Cascade)
+  service  Service? @relation(fields: [serviceId], references: [id], onDelete: SetNull)
+
+  @@index([proposalId])
+}
+
+// A DocuSign envelope. `kind` separates the proposal document from the
+// engagement letter so both can hang off the same proposal.
+model Envelope {
+  id             String    @id @default(cuid())
+  proposalId     String
+  kind           String    @default("ENGAGEMENT_LETTER") // PROPOSAL | ENGAGEMENT_LETTER
+  provider       String    @default("DOCUSIGN")
+  externalId     String?   @unique // DocuSign envelopeId
+  status         String    @default("CREATED") // CREATED | SENT | DELIVERED | COMPLETED | DECLINED | VOIDED
+  recipientName  String
+  recipientEmail String
+  subject        String?
+  documentHtml   String? // rendered engagement letter, kept for audit + mock signing
+  signedAt       DateTime?
+  sentAt         DateTime?
+  declinedAt     DateTime?
+  signerIp       String?
+  signerName     String? // typed signature captured in embedded mock mode
+  lastEventRaw   String?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  proposal Proposal @relation(fields: [proposalId], references: [id], onDelete: Cascade)
+
+  @@index([proposalId])
+  @@index([status])
+}
+
+model Payment {
+  id               String    @id @default(cuid())
+  proposalId       String?
+  clientId         String?
+  provider         String    @default("PAYSTACK") // PAYSTACK | MANUAL
+  reference        String    @unique
+  accessCode       String?
+  authorizationUrl String?
+  amount           Float
+  currency         String    @default("ZAR")
+  status           String    @default("PENDING") // PENDING | SUCCESS | FAILED | ABANDONED | REFUNDED
+  channel          String?
+  customerEmail    String?
+  paidAt           DateTime?
+  lastEventRaw     String?
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+
+  proposal Proposal? @relation(fields: [proposalId], references: [id], onDelete: SetNull)
+  client   Client?   @relation(fields: [clientId], references: [id], onDelete: SetNull)
+
+  @@index([status])
+  @@index([proposalId])
+}
+
+// ---------------------------------------------------------------------------
+// 3. Clients & onboarding
+// ---------------------------------------------------------------------------
+
+model Client {
+  id                 String    @id @default(cuid())
+  reference          String    @unique // CL-0001
+  name               String
+  legalName          String?
+  email              String
+  phone              String?
+  address            String?
+  industry           String?
+  taxNumber          String?
+  registrationNumber String?
+  status             String    @default("ONBOARDING") // ONBOARDING | ACTIVE | ON_HOLD | OFFBOARDED
+  currency           String    @default("ZAR")
+  monthlyFee         Float     @default(0)
+  billingCycle       String    @default("MONTHLY")
+  financialYearEnd   String?
+  startDate          DateTime?
+  ownerId            String?
+  colorTag           String    @default("#3564ff")
+  notes              String?
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
+
+  owner      User?                   @relation("ClientOwner", fields: [ownerId], references: [id], onDelete: SetNull)
+  lead       Lead?
+  contacts   ClientContact[]
+  onboarding Onboarding?
+  proposals  Proposal[]
+  payments   Payment[]
+  tasks      Task[]
+  templates  RecurringTaskTemplate[]
+
+  @@index([status])
+  @@index([ownerId])
+}
+
+model ClientContact {
+  id        String  @id @default(cuid())
+  clientId  String
+  name      String
+  email     String
+  phone     String?
+  role      String?
+  isPrimary Boolean @default(false)
+
+  client Client @relation(fields: [clientId], references: [id], onDelete: Cascade)
+
+  @@index([clientId])
+}
+
+model Onboarding {
+  id                String    @id @default(cuid())
+  clientId          String    @unique
+  stage             String    @default("INFORMATION_REQUESTED") // INFORMATION_REQUESTED | INFORMATION_RECEIVED | SETUP | REVIEW | COMPLETE
+  ownerId           String?
+  startedAt         DateTime  @default(now())
+  targetCompleteAt  DateTime?
+  completedAt       DateTime?
+  welcomePackSentAt DateTime?
+  notes             String?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  client Client           @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  owner  User?            @relation("OnboardingOwner", fields: [ownerId], references: [id], onDelete: SetNull)
+  items  OnboardingItem[]
+  tasks  Task[]
+
+  @@index([stage])
+}
+
+model OnboardingItem {
+  id           String    @id @default(cuid())
+  onboardingId String
+  stage        String    @default("INFORMATION_REQUESTED")
+  title        String
+  description  String?
+  type         String    @default("DOCUMENT") // DOCUMENT | INFO | ACTION
+  required     Boolean   @default(true)
+  status       String    @default("PENDING") // PENDING | RECEIVED | APPROVED | WAIVED
+  receivedAt   DateTime?
+  approvedAt   DateTime?
+  dueDate      DateTime?
+  sortOrder    Int       @default(0)
+
+  onboarding  Onboarding   @relation(fields: [onboardingId], references: [id], onDelete: Cascade)
+  attachments Attachment[]
+
+  @@index([onboardingId])
+}
+
+// ---------------------------------------------------------------------------
+// 4. Task management
+// ---------------------------------------------------------------------------
+
+model Task {
+  id            String    @id @default(cuid())
+  reference     String    @unique // TK-0001
+  title         String
+  description   String?
+  clientId      String?
+  parentId      String?
+  status        String    @default("TODO") // TODO | IN_PROGRESS | BLOCKED | REVIEW | DONE
+  priority      String    @default("MEDIUM") // LOW | MEDIUM | HIGH | URGENT
+  category      String    @default("OTHER") // BOOKKEEPING | VAT | PAYROLL | ANNUAL_ACCOUNTS | TAX | ADVISORY | COMPLIANCE | ONBOARDING | SALES | OTHER
+  assigneeId    String?
+  createdById   String?
+  startDate     DateTime?
+  dueDate       DateTime?
+  completedAt   DateTime?
+  estimateHours Float?
+  actualHours   Float?
+  labels        String? // comma separated
+  position      Float     @default(0) // ordering within a kanban column
+  source        String    @default("MANUAL") // MANUAL | RECURRING | ONBOARDING | PIPELINE
+  templateId    String?
+  periodKey     String? // e.g. "2026-03" — guarantees one task per template per period
+  leadId        String?
+  proposalId    String?
+  onboardingId  String?
+  bookingId     String?
+  archivedAt    DateTime?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  client      Client?                @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  parent      Task?                  @relation("Subtasks", fields: [parentId], references: [id], onDelete: Cascade)
+  subtasks    Task[]                 @relation("Subtasks")
+  assignee    User?                  @relation("TaskAssignee", fields: [assigneeId], references: [id], onDelete: SetNull)
+  createdBy   User?                  @relation("TaskCreator", fields: [createdById], references: [id], onDelete: SetNull)
+  template    RecurringTaskTemplate? @relation(fields: [templateId], references: [id], onDelete: SetNull)
+  lead        Lead?                  @relation(fields: [leadId], references: [id], onDelete: SetNull)
+  proposal    Proposal?              @relation(fields: [proposalId], references: [id], onDelete: SetNull)
+  onboarding  Onboarding?            @relation(fields: [onboardingId], references: [id], onDelete: SetNull)
+  booking     DiscoveryBooking?      @relation(fields: [bookingId], references: [id], onDelete: SetNull)
+  comments    TaskComment[]
+  reminders   TaskReminder[]
+  attachments Attachment[]
+
+  @@unique([templateId, periodKey])
+  @@index([clientId, status])
+  @@index([assigneeId, status])
+  @@index([dueDate])
+  @@index([parentId])
+}
+
+model TaskComment {
+  id        String   @id @default(cuid())
+  taskId    String
+  userId    String?
+  body      String
+  createdAt DateTime @default(now())
+
+  task Task  @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  user User? @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([taskId])
+}
+
+model RecurringTaskTemplate {
+  id            String    @id @default(cuid())
+  name          String
+  description   String?
+  clientId      String?
+  category      String    @default("OTHER")
+  priority      String    @default("MEDIUM")
+  assigneeId    String?
+  frequency     String    @default("MONTHLY") // DAILY | WEEKLY | BIWEEKLY | MONTHLY | QUARTERLY | SEMIANNUAL | ANNUAL
+  interval      Int       @default(1)
+  dayOfWeek     Int? // 0=Sun .. 6=Sat, for WEEKLY / BIWEEKLY
+  dayOfMonth    Int? // 1..31 (clamped to month length)
+  monthOfYear   Int? // 1..12 anchor for QUARTERLY / SEMIANNUAL / ANNUAL
+  // Task is generated this many days before its due date so the team has runway.
+  leadTimeDays  Int       @default(7)
+  estimateHours Float?
+  subtaskTitles String? // JSON array of strings, cloned onto every generated task
+  active        Boolean   @default(true)
+  startDate     DateTime  @default(now())
+  endDate       DateTime?
+  nextDueAt     DateTime?
+  lastRunAt     DateTime?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  client   Client? @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  assignee User?   @relation("TemplateAssignee", fields: [assigneeId], references: [id], onDelete: SetNull)
+  tasks    Task[]
+
+  @@index([active, nextDueAt])
+  @@index([clientId])
+}
+
+// One row per (task, rule) so a reminder is never sent twice.
+model TaskReminder {
+  id           String    @id @default(cuid())
+  taskId       String
+  kind         String // BEFORE_DUE | DUE_TODAY | OVERDUE
+  offsetDays   Int       @default(0)
+  scheduledFor DateTime
+  sentAt       DateTime?
+  status       String    @default("SCHEDULED") // SCHEDULED | SENT | SKIPPED | FAILED
+  error        String?
+  createdAt    DateTime  @default(now())
+
+  task Task @relation(fields: [taskId], references: [id], onDelete: Cascade)
+
+  @@unique([taskId, kind, offsetDays])
+  @@index([status, scheduledFor])
+}
+
+// ---------------------------------------------------------------------------
+// Cross-cutting
+// ---------------------------------------------------------------------------
+
+model Attachment {
+  id               String   @id @default(cuid())
+  fileName         String
+  mimeType         String
+  size             Int
+  storagePath      String
+  uploadedById     String?
+  taskId           String?
+  onboardingItemId String?
+  createdAt        DateTime @default(now())
+
+  uploadedBy     User?           @relation(fields: [uploadedById], references: [id], onDelete: SetNull)
+  task           Task?           @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  onboardingItem OnboardingItem? @relation(fields: [onboardingItemId], references: [id], onDelete: Cascade)
+}
+
+model EmailLog {
+  id          String   @id @default(cuid())
+  to          String
+  cc          String?
+  subject     String
+  body        String
+  template    String?
+  status      String   @default("SENT") // SENT | FAILED | PREVIEW
+  error       String?
+  relatedType String?
+  relatedId   String?
+  sentAt      DateTime @default(now())
+
+  @@index([relatedType, relatedId])
+  @@index([sentAt])
+}
+
+model Notification {
+  id        String    @id @default(cuid())
+  userId    String
+  title     String
+  body      String?
+  link      String?
+  kind      String    @default("INFO") // INFO | SUCCESS | WARNING | ACTION
+  readAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, readAt])
+}
+
+model Setting {
+  key       String   @id
+  value     String // JSON encoded
+  updatedAt DateTime @updatedAt
+}
+
+model AuditLog {
+  id         String   @id @default(cuid())
+  userId     String?
+  action     String
+  entityType String
+  entityId   String
+  meta       String?
+  createdAt  DateTime @default(now())
+
+  user User? @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([entityType, entityId])
+}
+
+// Inbound provider webhooks, stored for idempotency and replay.
+model WebhookEvent {
+  id          String    @id @default(cuid())
+  provider    String // DOCUSIGN | PAYSTACK
+  externalId  String
+  eventType   String
+  payload     String
+  status      String    @default("RECEIVED") // RECEIVED | PROCESSED | IGNORED | FAILED
+  error       String?
+  processedAt DateTime?
+  createdAt   DateTime  @default(now())
+
+  @@unique([provider, externalId])
+}
+
+// Sequential reference numbers (LD-0001, PR-0001, CL-0001, TK-0001).
+model Counter {
+  name  String @id
+  value Int    @default(0)
+}
