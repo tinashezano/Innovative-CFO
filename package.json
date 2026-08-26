@@ -16,7 +16,7 @@
     "setup": "prisma generate && prisma db push && npm run db:seed",
     "scheduler": "tsx --conditions=react-server scripts/scheduler.ts",
     "jobs:run": "tsx --conditions=react-server scripts/run-jobs.ts",
-    "test": "tsx tests/recurrence.test.ts && tsx --conditions=react-server tests/workflow.test.ts"
+    "test": "tsx tests/recurrence.test.ts && tsx --conditions=react-server tests/security.test.ts && tsx --conditions=react-server tests/workflow.test.ts"
   },
   "dependencies": {
     "@prisma/client": "^6.19.3",
