@@ -16,7 +16,7 @@
     "setup": "prisma generate && prisma db push && npm run db:seed",
     "scheduler": "tsx scripts/scheduler.ts",
     "jobs:run": "tsx scripts/run-jobs.ts",
-    "test": "tsx tests/recurrence.test.ts && tsx tests/workflow.test.ts"
+    "test": "tsx tests/recurrence.test.ts && tsx --conditions=react-server tests/workflow.test.ts"
   },
   "prisma": {
     "seed": "tsx prisma/seed.ts"
