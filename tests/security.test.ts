@@ -116,6 +116,40 @@ async function main() {
     assert.equal(render('Hi {{missing}}!', {}), 'Hi !');
   });
 
+  // --- Database URL resolution ---
+  const { resolveDatabaseUrl, providerForUrl } = await import('../src/lib/database-url');
+
+  check('an explicit DATABASE_URL beats anything a host injected', () => {
+    const r = resolveDatabaseUrl({ DATABASE_URL: 'postgresql://mine', POSTGRES_URL: 'postgresql://theirs' } as NodeJS.ProcessEnv);
+    assert.equal(r.source, 'DATABASE_URL');
+    assert.equal(r.url, 'postgresql://mine');
+  });
+
+  check('a Vercel Postgres store is picked up without DATABASE_URL', () => {
+    // The pooled URL is preferred, which is what a serverless deployment needs.
+    const r = resolveDatabaseUrl({
+      POSTGRES_PRISMA_URL: 'postgresql://pooled',
+      POSTGRES_URL: 'postgresql://direct',
+      POSTGRES_URL_NON_POOLING: 'postgresql://nonpooled',
+    } as NodeJS.ProcessEnv);
+    assert.equal(r.source, 'POSTGRES_PRISMA_URL');
+  });
+
+  check('a blank value is treated as unset', () => {
+    const r = resolveDatabaseUrl({ DATABASE_URL: '   ', POSTGRES_URL: 'postgresql://x' } as NodeJS.ProcessEnv);
+    assert.equal(r.source, 'POSTGRES_URL');
+    assert.equal(resolveDatabaseUrl({} as NodeJS.ProcessEnv).source, null);
+  });
+
+  check('the provider is derived from the URL scheme', () => {
+    assert.equal(providerForUrl('file:./dev.db'), 'sqlite');
+    assert.equal(providerForUrl('postgresql://h/db'), 'postgresql');
+    assert.equal(providerForUrl('postgres://h/db'), 'postgresql');
+    assert.equal(providerForUrl('prisma+postgres://h/db'), 'postgresql');
+    assert.equal(providerForUrl('mysql://h/db'), null);
+    assert.equal(providerForUrl(null), null);
+  });
+
   console.log(`\n${passed} checks passed`);
 }
 

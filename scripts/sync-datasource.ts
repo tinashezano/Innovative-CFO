@@ -13,23 +13,21 @@
  */
 import fs from 'node:fs';
 import path from 'node:path';
+import { providerForUrl, resolveDatabaseUrl } from '../src/lib/database-url';
 
 const SCHEMA = path.join(process.cwd(), 'prisma', 'schema.prisma');
 
-function providerFor(url: string | undefined): 'sqlite' | 'postgresql' | null {
-  if (!url) return null;
-  if (url.startsWith('file:')) return 'sqlite';
-  if (url.startsWith('postgres://') || url.startsWith('postgresql://')) return 'postgresql';
-  if (url.startsWith('prisma://') || url.startsWith('prisma+postgres://')) return 'postgresql';
-  return null;
-}
-
-const target = providerFor(process.env.DATABASE_URL);
+const { url, source } = resolveDatabaseUrl();
+const target = providerForUrl(url);
 
 if (!target) {
   // No URL, or a scheme we do not map: leave the committed schema alone.
-  console.log('[datasource] DATABASE_URL not recognised — leaving the schema as committed');
+  console.log('[datasource] no recognised database URL — leaving the schema as committed');
   process.exit(0);
+}
+
+if (source && source !== 'DATABASE_URL') {
+  console.log(`[datasource] using ${source} (DATABASE_URL is not set)`);
 }
 
 const schema = fs.readFileSync(SCHEMA, 'utf8');

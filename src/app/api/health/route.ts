@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/db';
+import { DATABASE_URL_VARS, resolveDatabaseUrl } from '@/lib/database-url';
 
 export const dynamic = 'force-dynamic';
 
@@ -33,15 +34,17 @@ export async function GET() {
     checks.push({ name: 'AUTH_SECRET', ok: true, detail: `set (${authSecret.length} characters)` });
   }
 
-  // --- DATABASE_URL shape ---
-  const url = process.env.DATABASE_URL ?? '';
+  // --- Database URL, under whichever name the host injected it ---
+  const resolved = resolveDatabaseUrl();
+  const url = resolved.url ?? '';
   const scheme = url.split(':')[0] || '(none)';
+  const via = resolved.source && resolved.source !== 'DATABASE_URL' ? ` (via ${resolved.source})` : '';
   if (!url) {
     checks.push({
       name: 'DATABASE_URL',
       ok: false,
-      detail: 'not set',
-      fix: 'Add DATABASE_URL pointing at your database and redeploy.',
+      detail: `not set — looked for ${DATABASE_URL_VARS.join(', ')}`,
+      fix: 'Add DATABASE_URL pointing at your database, or attach a Postgres store, then redeploy.',
     });
   } else if (url.startsWith('file:')) {
     checks.push({
@@ -51,7 +54,7 @@ export async function GET() {
       fix: 'On a serverless host the filesystem is not durable — use Postgres for anything you want to keep.',
     });
   } else {
-    checks.push({ name: 'DATABASE_URL', ok: true, detail: `${scheme} connection configured` });
+    checks.push({ name: 'DATABASE_URL', ok: true, detail: `${scheme} connection configured${via}` });
   }
 
   // --- Can we actually reach the database, and are the tables there? ---

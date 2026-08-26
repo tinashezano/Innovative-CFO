@@ -186,10 +186,24 @@ variables —
 
 | Variable | Value |
 |---|---|
-| `DATABASE_URL` | your Postgres connection string |
-| `APP_URL` | your deployed URL, e.g. `https://ops.yourfirm.co.za` |
-| `AUTH_SECRET` | `node -e "console.log(require('crypto').randomBytes(48).toString('base64url'))"` |
-| `CRON_SECRET` | same command again |
+| `AUTH_SECRET` | A long random string — generate with the command below |
+| `CRON_SECRET` | Another one, for the daily job endpoint |
+| `APP_URL` | Your deployed address, e.g. `https://ops.yourfirm.co.za` |
+| `DATABASE_URL` | Your Postgres connection string |
+
+Generate the two secrets with:
+
+```bash
+node -e "console.log(require('crypto').randomBytes(48).toString('base64url'))"
+```
+
+`DATABASE_URL` is optional if you attach a Postgres store — the app also reads
+`POSTGRES_PRISMA_URL`, `POSTGRES_URL` and `POSTGRES_URL_NON_POOLING`, which is
+what those integrations actually inject. `/api/health` names which one it found.
+
+**Set these before the first deploy, or redeploy after adding them.** Vercel
+bakes environment variables in at build time, so adding one to an existing
+project does nothing until the next build.
 
 Deploy, then seed once from your machine:
 

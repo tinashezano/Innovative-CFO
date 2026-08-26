@@ -1,4 +1,9 @@
 import { PrismaClient } from '@prisma/client';
+import { applyDatabaseUrl } from './database-url';
+
+// Prisma reads DATABASE_URL and nothing else, so map whatever the host injected
+// onto that name before the client is created.
+applyDatabaseUrl();
 
 const globalForPrisma = globalThis as unknown as { prisma?: PrismaClient };
 
