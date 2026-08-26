@@ -24,9 +24,13 @@ export default async function LoginPage() {
         </div>
 
         <p className="mt-6 text-center text-xs leading-relaxed text-slate-400">
-          Demo sign-in: admin@innovativecfo.co.za / ChangeMe123!
+          Seeded accounts use the password from <code className="font-mono">SEED_PASSWORD</code>.
           <br />
-          Change these before putting the app in front of anyone.
+          Trouble signing in? Open{' '}
+          <a href="/api/health" className="underline hover:text-slate-600">
+            /api/health
+          </a>{' '}
+          to see what is misconfigured.
         </p>
       </div>
     </main>

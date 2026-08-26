@@ -1,0 +1,147 @@
+import { NextResponse } from 'next/server';
+import { prisma } from '@/lib/db';
+
+export const dynamic = 'force-dynamic';
+
+/**
+ * Deployment diagnostics: open /api/health in a browser to see why the app is
+ * not working before you can sign in.
+ *
+ * Deliberately reports only presence, shape and counts — never a secret value
+ * or a connection string — so it is safe to hit on a public deployment.
+ */
+export async function GET() {
+  const checks: { name: string; ok: boolean; detail: string; fix?: string }[] = [];
+
+  // --- AUTH_SECRET ---
+  const authSecret = process.env.AUTH_SECRET ?? '';
+  if (!authSecret) {
+    checks.push({
+      name: 'AUTH_SECRET',
+      ok: false,
+      detail: 'not set — sign-in cannot sign a session cookie',
+      fix: 'Add AUTH_SECRET (a long random string) to your environment variables and redeploy.',
+    });
+  } else if (authSecret.length < 32) {
+    checks.push({
+      name: 'AUTH_SECRET',
+      ok: false,
+      detail: `only ${authSecret.length} characters — needs at least 32`,
+      fix: 'Replace AUTH_SECRET with a longer random string and redeploy.',
+    });
+  } else {
+    checks.push({ name: 'AUTH_SECRET', ok: true, detail: `set (${authSecret.length} characters)` });
+  }
+
+  // --- DATABASE_URL shape ---
+  const url = process.env.DATABASE_URL ?? '';
+  const scheme = url.split(':')[0] || '(none)';
+  if (!url) {
+    checks.push({
+      name: 'DATABASE_URL',
+      ok: false,
+      detail: 'not set',
+      fix: 'Add DATABASE_URL pointing at your database and redeploy.',
+    });
+  } else if (url.startsWith('file:')) {
+    checks.push({
+      name: 'DATABASE_URL',
+      ok: true,
+      detail: 'SQLite (file-backed)',
+      fix: 'On a serverless host the filesystem is not durable — use Postgres for anything you want to keep.',
+    });
+  } else {
+    checks.push({ name: 'DATABASE_URL', ok: true, detail: `${scheme} connection configured` });
+  }
+
+  // --- Can we actually reach the database, and are the tables there? ---
+  let userCount: number | null = null;
+  try {
+    userCount = await prisma.user.count();
+    checks.push({ name: 'Database connection', ok: true, detail: 'reachable, schema present' });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    const missingTables = /does not exist|no such table|relation .* does not exist/i.test(message);
+    const providerMismatch = /provider|the URL must start with the protocol/i.test(message);
+
+    checks.push({
+      name: 'Database connection',
+      ok: false,
+      detail: missingTables
+        ? 'reachable, but the tables have not been created'
+        : providerMismatch
+          ? 'the schema provider does not match DATABASE_URL'
+          : `could not connect — ${message.split('\n')[0]?.slice(0, 160)}`,
+      fix: missingTables
+        ? 'Run: DATABASE_URL="<your url>" npx prisma db push'
+        : providerMismatch
+          ? 'Redeploy — the build now derives the provider from DATABASE_URL automatically.'
+          : 'Check DATABASE_URL is correct and that the database accepts connections from your host.',
+    });
+  }
+
+  // --- Are there any accounts to sign in with? ---
+  if (userCount !== null) {
+    if (userCount === 0) {
+      checks.push({
+        name: 'Accounts',
+        ok: false,
+        detail: 'the database has no users, so no one can sign in',
+        fix: 'Run: DATABASE_URL="<your url>" SEED_PASSWORD="<your password>" npm run db:seed',
+      });
+    } else {
+      checks.push({ name: 'Accounts', ok: true, detail: `${userCount} user${userCount === 1 ? '' : 's'}` });
+    }
+  }
+
+  // --- APP_URL, which builds the links emailed to prospects ---
+  const appUrl = process.env.APP_URL ?? '';
+  if (!appUrl) {
+    checks.push({
+      name: 'APP_URL',
+      ok: false,
+      detail: 'not set — booking and proposal links will point at localhost',
+      fix: 'Set APP_URL to this deployment’s address and redeploy.',
+    });
+  } else if (appUrl.includes('localhost')) {
+    // Correct when you are running locally; a real problem once deployed,
+    // because it is what builds the links emailed to prospects.
+    const deployed = process.env.NODE_ENV === 'production';
+    checks.push({
+      name: 'APP_URL',
+      ok: !deployed,
+      detail: deployed
+        ? `still ${appUrl} — booking and proposal links emailed to prospects will not work`
+        : `${appUrl} — correct for local development`,
+      fix: deployed ? 'Set APP_URL to this deployment’s address and redeploy.' : undefined,
+    });
+  } else {
+    checks.push({ name: 'APP_URL', ok: true, detail: appUrl });
+  }
+
+  // --- Integration modes, so the demo/live state is never a surprise ---
+  checks.push({
+    name: 'Integrations',
+    ok: true,
+    detail: [
+      `email ${process.env.EMAIL_MODE === 'smtp' ? 'live' : 'demo (logged, not sent)'}`,
+      `DocuSign ${process.env.DOCUSIGN_MODE === 'live' ? 'live' : 'demo'}`,
+      `Paystack ${process.env.PAYSTACK_MODE === 'live' ? 'live' : 'demo'}`,
+    ].join(', '),
+  });
+
+  const problems = checks.filter((c) => !c.ok);
+  const healthy = problems.length === 0;
+
+  return NextResponse.json(
+    {
+      status: healthy ? 'ok' : 'needs attention',
+      summary: healthy
+        ? 'Everything checks out. You should be able to sign in.'
+        : `${problems.length} thing${problems.length === 1 ? '' : 's'} to fix before sign-in will work.`,
+      checks,
+      nextSteps: problems.map((p) => p.fix).filter(Boolean),
+    },
+    { status: healthy ? 200 : 503 },
+  );
+}

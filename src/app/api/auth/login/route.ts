@@ -10,6 +10,24 @@ const schema = z.object({
 });
 
 export async function POST(request: Request) {
+  try {
+    return await signIn(request);
+  } catch (err) {
+    // A misconfigured deployment (no AUTH_SECRET, unreachable database) would
+    // otherwise return an HTML error page, which the sign-in form can only
+    // report as a generic failure. Answer in JSON and point at the diagnosis.
+    console.error('[auth] sign-in failed:', err);
+    return NextResponse.json(
+      {
+        error:
+          'The server is not configured correctly, so sign-in cannot run. Open /api/health for details.',
+      },
+      { status: 500 },
+    );
+  }
+}
+
+async function signIn(request: Request) {
   const parsed = schema.safeParse(await request.json().catch(() => null));
   if (!parsed.success) {
     return NextResponse.json({ error: 'Enter an email address and password' }, { status: 400 });

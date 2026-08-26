@@ -154,18 +154,29 @@ colleagues to try it.
 Because the app writes to a database, it needs a host with either a durable
 filesystem or a Postgres instance.
 
+> **Two steps people miss.** The build now points Prisma at whatever
+> `DATABASE_URL` you give it, so there is no schema edit to remember. But a new
+> database starts empty: you still have to create the tables and seed an account,
+> or sign-in fails with *"The server is not configured correctly"*. Both commands
+> are below. If anything is off, open **`/api/health`** on your deployment — it
+> names the problem and the command that fixes it.
+
 **One-click, via Vercel** — this forks the repo, provisions Postgres and
 prompts for the settings it needs:
 
 [![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https%3A%2F%2Fgithub.com%2Ftinashezano%2FInnovative-CFO%2Ftree%2Fclaude%2Faccounting-operations-app-obl5sb&env=AUTH_SECRET,CRON_SECRET,APP_URL&envDescription=AUTH_SECRET%20and%20CRON_SECRET%20are%20long%20random%20strings.%20APP_URL%20is%20your%20deployed%20URL.&project-name=innovative-cfo&repository-name=innovative-cfo&stores=%5B%7B%22type%22%3A%22postgres%22%7D%5D)
 
-Run `npm run use:postgres` and commit **before** deploying, so the schema
-targets Postgres. After the first deploy, create the tables:
+After the first deploy, create the tables and an account to sign in with.
+Copy `DATABASE_URL` out of the Vercel dashboard, then from your clone:
 
 ```bash
 DATABASE_URL="<your postgres url>" npx prisma db push
-DATABASE_URL="<your postgres url>" npm run db:seed    # optional demo data
+DATABASE_URL="<your postgres url>" SEED_PASSWORD="<your password>" npm run db:seed
 ```
+
+The first creates the tables; the second creates the three accounts and the
+demo data. Skip the second and the database has no users, so nobody can sign
+in.
 
 **Or set it up by hand:**
 
@@ -197,6 +208,21 @@ process for the daily job.
 
 > `APP_URL` matters: it builds the booking and proposal links that get emailed
 > to prospects, so it has to be the address they can actually reach.
+
+### If a deployment will not let you sign in
+
+Open **`https://your-app/api/health`**. It reports, without exposing any secret:
+
+| Check | What a failure means |
+|---|---|
+| `AUTH_SECRET` | Missing or under 32 characters — sessions cannot be signed |
+| `DATABASE_URL` | Not set, or not a scheme the app recognises |
+| `Database connection` | Unreachable, or the tables were never created |
+| `Accounts` | The database is empty — run the seed |
+| `APP_URL` | Still localhost, so emailed booking and proposal links will break |
+
+Each failure comes with the exact command that fixes it. A misconfigured server
+now also says so on the sign-in form itself, rather than failing silently.
 
 ### Try the whole pipeline in five minutes
 
@@ -302,6 +328,7 @@ a TypeScript union rather than a Prisma enum. `npm run use:sqlite` switches back
 | `npm run setup` | Write `.env`, create the database, load demo data |
 | `npm run doctor` | Diagnose an install that will not start |
 | `npm run set-password` | Change an account password without re-seeding |
+| `/api/health` | Deployment diagnostics — open it in a browser |
 | `npm run dev` | Development server |
 | `npm run build` / `npm start` | Production build and serve |
 | `npm run db:push` | Apply schema changes |
