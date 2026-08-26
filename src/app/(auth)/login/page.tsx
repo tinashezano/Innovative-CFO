@@ -1,5 +1,6 @@
 import { redirect } from 'next/navigation';
 import { getSessionUser } from '@/lib/auth';
+import { prisma } from '@/lib/db';
 import { LoginForm } from './login-form';
 
 export const dynamic = 'force-dynamic';
@@ -7,6 +8,17 @@ export const dynamic = 'force-dynamic';
 export default async function LoginPage() {
   const user = await getSessionUser();
   if (user) redirect('/');
+
+  // A deployment with no accounts cannot be signed into; send it to first-run
+  // setup rather than showing a form that can only fail. redirect() works by
+  // throwing, so the count is caught separately and the redirect happens after.
+  let userCount: number | null = null;
+  try {
+    userCount = await prisma.user.count();
+  } catch {
+    // Database unreachable — fall through and let the form surface the error.
+  }
+  if (userCount === 0) redirect('/setup');
 
   return (
     <main className="flex min-h-screen items-center justify-center bg-slate-50 px-4 py-12">

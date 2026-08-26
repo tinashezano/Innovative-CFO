@@ -120,7 +120,7 @@ async function main() {
   const { resolveDatabaseUrl, providerForUrl } = await import('../src/lib/database-url');
 
   check('an explicit DATABASE_URL beats anything a host injected', () => {
-    const r = resolveDatabaseUrl({ DATABASE_URL: 'postgresql://mine', POSTGRES_URL: 'postgresql://theirs' } as NodeJS.ProcessEnv);
+    const r = resolveDatabaseUrl({ DATABASE_URL: 'postgresql://mine', POSTGRES_URL: 'postgresql://theirs' } as unknown as NodeJS.ProcessEnv);
     assert.equal(r.source, 'DATABASE_URL');
     assert.equal(r.url, 'postgresql://mine');
   });
@@ -131,14 +131,14 @@ async function main() {
       POSTGRES_PRISMA_URL: 'postgresql://pooled',
       POSTGRES_URL: 'postgresql://direct',
       POSTGRES_URL_NON_POOLING: 'postgresql://nonpooled',
-    } as NodeJS.ProcessEnv);
+    } as unknown as NodeJS.ProcessEnv);
     assert.equal(r.source, 'POSTGRES_PRISMA_URL');
   });
 
   check('a blank value is treated as unset', () => {
-    const r = resolveDatabaseUrl({ DATABASE_URL: '   ', POSTGRES_URL: 'postgresql://x' } as NodeJS.ProcessEnv);
+    const r = resolveDatabaseUrl({ DATABASE_URL: '   ', POSTGRES_URL: 'postgresql://x' } as unknown as NodeJS.ProcessEnv);
     assert.equal(r.source, 'POSTGRES_URL');
-    assert.equal(resolveDatabaseUrl({} as NodeJS.ProcessEnv).source, null);
+    assert.equal(resolveDatabaseUrl({} as unknown as NodeJS.ProcessEnv).source, null);
   });
 
   check('the provider is derived from the URL scheme', () => {

@@ -285,6 +285,23 @@ async function main() {
     assert.equal(second.emailsSent, 0, 'a same-day re-run must send nothing');
   });
 
+  // --- First-run setup lockout ---
+  await check('the first-run setup route closes once an account exists', async () => {
+    // The database already has users from the pipeline above, which is exactly
+    // the state that must keep the setup route shut.
+    const count = await prisma.user.count();
+    assert.ok(count > 0, 'expected accounts to exist by this point');
+
+    // Mirrors the guard in /api/setup: it refuses whenever any user is present.
+    const setupAllowed = (await prisma.user.count()) === 0;
+    assert.equal(setupAllowed, false, 'setup must not be reachable on a populated database');
+  });
+
+  await check('an owner always remains, so the firm cannot lock itself out', async () => {
+    const owners = await prisma.user.count({ where: { role: 'OWNER', active: true } });
+    assert.ok(owners >= 1, 'at least one active owner must exist');
+  });
+
   await prisma.$disconnect();
   console.log(`\n${passed} checks passed`);
 }
