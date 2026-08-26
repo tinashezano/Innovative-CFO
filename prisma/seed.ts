@@ -5,12 +5,20 @@
  *
  * Safe to re-run: it clears the demo data first.
  */
+import 'dotenv/config';
 import { PrismaClient } from '@prisma/client';
 import bcrypt from 'bcryptjs';
 
 const prisma = new PrismaClient();
 
-const DEMO_PASSWORD = 'ChangeMe123!';
+/**
+ * Password given to the three seeded accounts.
+ *
+ * Set SEED_PASSWORD in .env to choose your own — .env is gitignored, so your
+ * password never reaches the repository. Without it the accounts fall back to
+ * a placeholder that is obviously meant to be replaced.
+ */
+const DEMO_PASSWORD = process.env.SEED_PASSWORD || 'ChangeMe123!';
 
 function addDays(date: Date, days: number): Date {
   const d = new Date(date);
@@ -815,7 +823,9 @@ async function main() {
   };
 
   console.log('\nSeed complete:', counts);
-  console.log('\nSign in with:');
+  console.log(
+    `\nSign in with${process.env.SEED_PASSWORD ? ' your SEED_PASSWORD' : ' the default password'}:`,
+  );
   console.log(`  Owner    admin@innovativecfo.co.za      / ${DEMO_PASSWORD}`);
   console.log(`  Manager  manager@innovativecfo.co.za    / ${DEMO_PASSWORD}`);
   console.log(`  Staff    accountant@innovativecfo.co.za / ${DEMO_PASSWORD}`);

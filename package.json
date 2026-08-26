@@ -20,7 +20,8 @@
     "bootstrap": "tsx scripts/bootstrap.ts",
     "use:sqlite": "tsx scripts/use-database.ts sqlite",
     "use:postgres": "tsx scripts/use-database.ts postgresql",
-    "doctor": "tsx scripts/doctor.ts"
+    "doctor": "tsx scripts/doctor.ts",
+    "set-password": "tsx scripts/set-password.ts"
   },
   "dependencies": {
     "@prisma/client": "^6.19.3",

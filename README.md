@@ -116,15 +116,30 @@ npm run doctor
 It checks your Node version, `.env`, dependencies, database and whether port
 3000 is free, and prints the one command that fixes each problem it finds.
 
-| Sign in as | Email | Password |
-|---|---|---|
-| Owner | `admin@innovativecfo.co.za` | `ChangeMe123!` |
-| Manager | `manager@innovativecfo.co.za` | `ChangeMe123!` |
-| Staff | `accountant@innovativecfo.co.za` | `ChangeMe123!` |
+| Sign in as | Email |
+|---|---|
+| Owner | `admin@innovativecfo.co.za` |
+| Manager | `manager@innovativecfo.co.za` |
+| Staff | `accountant@innovativecfo.co.za` |
 
-The three demo accounts exist so you can see how the roles differ. **Delete or
-deactivate them under Settings → Team before anyone outside your firm can reach
-the app.**
+All three share one password. Choose it by setting `SEED_PASSWORD` in your
+`.env` **before** running `npm run setup` — `.env` is gitignored, so your
+password never reaches the repository. Leave it blank and the accounts fall
+back to `ChangeMe123!`, which is published here and fine only on a machine
+nobody else can reach.
+
+To change a password later, without re-seeding and losing your data:
+
+```bash
+npm run set-password -- admin@innovativecfo.co.za 'your-new-password'
+```
+
+Quote the password so your shell does not interpret `!` or `$`.
+
+The three accounts exist so you can see how the roles differ. **Replace them
+with real people under Settings → Team before anyone outside your firm can
+reach the app** — add yourself first, since the app refuses to leave itself
+without an active owner.
 
 Everything works offline: DocuSign, Paystack and email all run in demo mode
 until you add credentials, so you can exercise the whole pipeline end to end
@@ -286,6 +301,7 @@ a TypeScript union rather than a Prisma enum. `npm run use:sqlite` switches back
 |---|---|
 | `npm run setup` | Write `.env`, create the database, load demo data |
 | `npm run doctor` | Diagnose an install that will not start |
+| `npm run set-password` | Change an account password without re-seeding |
 | `npm run dev` | Development server |
 | `npm run build` / `npm start` | Production build and serve |
 | `npm run db:push` | Apply schema changes |
