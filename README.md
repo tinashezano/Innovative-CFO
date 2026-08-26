@@ -80,25 +80,80 @@ Four views over the same work, all grouped by client:
 
 ---
 
-## Getting started
+## Get it running
+
+### Option 1 — on your own machine (fastest, ~2 minutes)
+
+Needs [Node 20 or newer](https://nodejs.org). Nothing else — no database to
+provision, no accounts to create.
 
 ```bash
+git clone -b claude/accounting-operations-app-obl5sb https://github.com/tinashezano/Innovative-CFO.git
+cd Innovative-CFO
 npm install
-cp .env.example .env      # then edit AUTH_SECRET and CRON_SECRET
-npm run setup             # generate client, create the database, seed demo data
+npm run setup     # writes .env with generated secrets, creates the database, loads demo data
 npm run dev
 ```
 
-Open <http://localhost:3000> and sign in:
+Open <http://localhost:3000>.
 
-| Role | Email | Password |
+`npm run setup` generates a real `AUTH_SECRET` and `CRON_SECRET` for you — there
+is nothing to edit by hand. Re-running it never overwrites secrets you have
+already set.
+
+| Sign in as | Email | Password |
 |---|---|---|
 | Owner | `admin@innovativecfo.co.za` | `ChangeMe123!` |
 | Manager | `manager@innovativecfo.co.za` | `ChangeMe123!` |
 | Staff | `accountant@innovativecfo.co.za` | `ChangeMe123!` |
 
-**Change these before anyone else can reach the app.** Add real people under
-Settings → Team, then deactivate the demo accounts.
+The three demo accounts exist so you can see how the roles differ. **Delete or
+deactivate them under Settings → Team before anyone outside your firm can reach
+the app.**
+
+Everything works offline: DocuSign, Paystack and email all run in demo mode
+until you add credentials, so you can exercise the whole pipeline end to end
+without signing up for anything. Emails are written to **Settings → Email log**
+rather than sent.
+
+### Option 2 — deploy it, so your team can test it
+
+Because the app writes to a database, it needs a host with either a durable
+filesystem or a Postgres instance.
+
+**Vercel + any hosted Postgres** (Neon, Supabase, Vercel Postgres):
+
+```bash
+npm run use:postgres          # switches the Prisma datasource
+git add -A && git commit -m "Use Postgres"
+```
+
+Then in Vercel: import the repo and set these environment variables —
+
+| Variable | Value |
+|---|---|
+| `DATABASE_URL` | your Postgres connection string |
+| `APP_URL` | your deployed URL, e.g. `https://ops.yourfirm.co.za` |
+| `AUTH_SECRET` | `node -e "console.log(require('crypto').randomBytes(48).toString('base64url'))"` |
+| `CRON_SECRET` | same command again |
+
+Deploy, then seed once from your machine:
+
+```bash
+DATABASE_URL="<your postgres url>" npx prisma db push
+DATABASE_URL="<your postgres url>" npm run db:seed    # optional — demo data
+```
+
+`vercel.json` already schedules the daily job at 04:00 UTC (06:00 SAST).
+
+**Railway / Render / a VPS** — these give you a durable disk, so SQLite is fine
+and there is no database to provision. Set `DATABASE_URL="file:./prisma/dev.db"`
+on a mounted volume, plus `APP_URL`, `AUTH_SECRET` and `CRON_SECRET`. Build with
+`npm run build`, start with `npm start`, and run `npm run scheduler` as a second
+process for the daily job.
+
+> `APP_URL` matters: it builds the booking and proposal links that get emailed
+> to prospects, so it has to be the address they can actually reach.
 
 ### Try the whole pipeline in five minutes
 
@@ -111,8 +166,6 @@ Settings → Team, then deactivate the demo accounts.
    pay on the demo checkout.
 6. The client now exists, with onboarding open and the recurring calendar
    installed. Settings → **Email log** shows every message the flow sent.
-
----
 
 ## Going live
 
@@ -186,17 +239,16 @@ npm run jobs:run         # or just once, right now
 You can also trigger it by hand from **Settings → Automation → Run it now**.
 
 ### Database
-SQLite by default, so there is nothing to provision. For production, switch to
-Postgres — no model changes needed, because every status field is a `String`
-backed by a TypeScript union rather than a Prisma enum:
+SQLite by default, so there is nothing to provision. Switch to Postgres with
+one command when you deploy somewhere the filesystem is not durable:
 
-```prisma
-datasource db {
-  provider = "postgresql"
-  url      = env("DATABASE_URL")
-}
+```bash
+npm run use:postgres
+npx prisma db push
 ```
-then `npx prisma db push`.
+
+No model changes are needed, because every status field is a `String` backed by
+a TypeScript union rather than a Prisma enum. `npm run use:sqlite` switches back.
 
 ---
 
@@ -204,13 +256,15 @@ then `npx prisma db push`.
 
 | Command | What it does |
 |---|---|
+| `npm run setup` | Write `.env`, create the database, load demo data |
 | `npm run dev` | Development server |
 | `npm run build` / `npm start` | Production build and serve |
-| `npm run setup` | Generate client, create the database, seed demo data |
-| `npm run db:reset` | Wipe and reseed |
 | `npm run db:push` | Apply schema changes |
-| `npm test` | Recurrence and end-to-end workflow tests |
-| `npm run typecheck` | TypeScript, no emit |
+| `npm run db:seed` | Reload the demo data |
+| `npm run use:postgres` | Switch the datasource to Postgres |
+| `npm run use:sqlite` | Switch it back to SQLite |
+| `npm test` | Recurrence, formatting, security and end-to-end workflow tests |
+| `npm run typecheck` / `npm run lint` | TypeScript and ESLint |
 | `npm run jobs:run` | Run the scheduled job once |
 | `npm run scheduler` | Long-running daily scheduler |
 

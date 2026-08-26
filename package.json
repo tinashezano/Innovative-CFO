@@ -7,16 +7,19 @@
     "dev": "next dev",
     "build": "prisma generate && next build",
     "start": "next start",
-    "lint": "next lint",
+    "lint": "eslint src tests scripts",
     "typecheck": "tsc --noEmit",
     "db:push": "prisma db push",
     "db:generate": "prisma generate",
     "db:seed": "tsx prisma/seed.ts",
     "db:reset": "prisma db push --force-reset && npm run db:seed",
-    "setup": "prisma generate && prisma db push && npm run db:seed",
+    "setup": "tsx scripts/bootstrap.ts && prisma generate && prisma db push && npm run db:seed",
     "scheduler": "tsx --conditions=react-server scripts/scheduler.ts",
     "jobs:run": "tsx --conditions=react-server scripts/run-jobs.ts",
-    "test": "tsx tests/recurrence.test.ts && tsx tests/format.test.ts && tsx --conditions=react-server tests/security.test.ts && tsx --conditions=react-server tests/workflow.test.ts"
+    "test": "tsx tests/recurrence.test.ts && tsx tests/format.test.ts && tsx --conditions=react-server tests/security.test.ts && tsx --conditions=react-server tests/workflow.test.ts",
+    "bootstrap": "tsx scripts/bootstrap.ts",
+    "use:sqlite": "tsx scripts/use-database.ts sqlite",
+    "use:postgres": "tsx scripts/use-database.ts postgresql"
   },
   "dependencies": {
     "@prisma/client": "^6.19.3",
@@ -47,5 +50,8 @@
     "tailwindcss": "^3.4.19",
     "tsx": "^4.23.12",
     "typescript": "^6.0.3"
+  },
+  "engines": {
+    "node": ">=20.0.0"
   }
 }
