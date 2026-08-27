@@ -1,21 +1,26 @@
 /**
- * Creates the database tables during deployment.
+ * Creates the database tables.
  *
- * Runs as part of `npm run build`. Without it, a fresh Postgres database has no
- * tables, every query fails, and the only symptom is a sign-in that will not
- * work — fixable solely by running Prisma from a laptop against the production
- * URL, which is a poor way to ship.
+ * Runs from `npm start` — at container start, not build. That distinction is
+ * the whole point: on hosts like Railway the database sits on a private network
+ * the build container cannot reach, so a build-time `db push` fails and the app
+ * deploys with no tables. By start-up the network is there. Also runs during
+ * `npm run build`, which is harmless when it works (Vercel) and warns when it
+ * cannot connect.
  *
  * Deliberately conservative:
- *  - Only runs against a remote database. Local SQLite is left to `npm run setup`.
  *  - No --accept-data-loss and no --force-reset, so Prisma refuses anything
  *    destructive rather than quietly dropping a column.
- *  - A failure warns instead of failing the build, so the deployment still comes
- *    up and /api/health can explain what went wrong.
+ *  - A failure warns rather than aborting, so the app still comes up and
+ *    /api/health can explain what went wrong. Never leave the server unable to
+ *    boot over this.
+ *  - `db push` against an already-current database is a no-op, so running it on
+ *    every start costs nothing.
  */
 import { execFileSync } from 'node:child_process';
 import { providerForUrl, resolveDatabaseUrl } from '../src/lib/database-url';
 
+const phase = process.env.NEXT_PHASE === 'phase-production-build' ? 'build' : 'startup';
 const { url, source } = resolveDatabaseUrl();
 
 if (!url) {
@@ -29,7 +34,7 @@ if (!url) {
 // `db push` against an already-current database is a no-op, so running it here
 // is safe locally too.
 const provider = providerForUrl(url);
-console.log(`[database] ensuring ${provider} tables exist (from ${source})`);
+console.log(`[database] ensuring ${provider} tables exist (from ${source}, at ${phase})`);
 
 try {
   execFileSync('npx', ['prisma', 'db', 'push', '--skip-generate'], {
@@ -38,6 +43,12 @@ try {
   });
   console.log('[database] tables are in sync');
 } catch {
-  console.warn('[database] could not sync the tables — the app will still deploy.');
-  console.warn('[database] open /api/health on the deployment to see what is wrong.');
+  if (phase === 'build') {
+    // Expected on hosts whose database is only reachable at runtime; the start
+    // command will do it. Not worth alarming anyone reading build logs.
+    console.warn('[database] could not reach the database during build — will retry at startup.');
+  } else {
+    console.warn('[database] could not sync the tables — the app will still start.');
+    console.warn('[database] open /api/health on the deployment to see what is wrong.');
+  }
 }
