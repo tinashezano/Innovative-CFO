@@ -1,6 +1,7 @@
 import { notFound } from 'next/navigation';
 import { prisma } from '@/lib/db';
 import { getSettings } from '@/lib/settings';
+import { busyPeriods, overlapsBusy } from '@/lib/google-calendar';
 import { addDays, startOfDay } from '@/lib/utils';
 import { BookingPicker } from './booking-picker';
 
@@ -36,8 +37,17 @@ export default async function PublicBookingPage({ params }: { params: Promise<{ 
     ).map((b) => b.scheduledAt.toISOString()),
   );
 
-  const slots: { date: string; times: string[] }[] = [];
   const from = startOfDay(addDays(new Date(), 1));
+  const horizon = addDays(from, 21);
+
+  // Also hide anything the owner is already busy with in Google Calendar, so a
+  // prospect cannot book over a meeting this app knows nothing about. Returns
+  // empty when no calendar is connected, leaving behaviour exactly as before.
+  const busy = lead.ownerId
+    ? await busyPeriods({ userId: lead.ownerId, from, to: horizon })
+    : [];
+
+  const slots: { date: string; times: string[] }[] = [];
 
   for (let dayOffset = 0; dayOffset < 21 && slots.length < 10; dayOffset += 1) {
     const day = addDays(from, dayOffset);
@@ -53,6 +63,10 @@ export default async function PublicBookingPage({ params }: { params: Promise<{ 
       slot.setHours(Math.floor(minutes / 60), minutes % 60, 0, 0);
       if (slot <= new Date()) continue;
       if (taken.has(slot.toISOString())) continue;
+
+      const slotEnd = new Date(slot.getTime() + settings.discoveryDurationMins * 60_000);
+      if (overlapsBusy(slot, slotEnd, busy)) continue;
+
       times.push(slot.toISOString());
     }
     if (times.length) slots.push({ date: day.toISOString(), times });

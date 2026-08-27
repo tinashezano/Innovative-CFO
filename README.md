@@ -324,6 +324,34 @@ In demo mode the engagement letter is rendered and signed inside the app. It is
 the *same document* and the *same webhook handler* — only the signing surface
 differs, so switching over changes nothing downstream.
 
+### Google Calendar
+```env
+GOOGLE_CLIENT_ID="....apps.googleusercontent.com"
+GOOGLE_CLIENT_SECRET="..."
+```
+1. In the [Google Cloud Console](https://console.cloud.google.com), create a
+   project and enable the **Google Calendar API**.
+2. Create an OAuth client of type **Web application**, and add this redirect URI:
+   `<APP_URL>/api/google/callback`
+3. While the consent screen is unverified, add each team member under
+   **Test users**, or Google refuses them at the consent step.
+4. Each person connects their own calendar under **Settings → Integrations**.
+
+Connected per person, because the lead's owner is whose calendar the call
+belongs in. Once connected:
+
+- the public booking page hides slots that person is already busy for, so a
+  prospect cannot book over a meeting this app knows nothing about;
+- a confirmed booking appears in their calendar with the prospect invited and a
+  **Google Meet** link, which the app then uses as the meeting link;
+- cancelling or rescheduling in the app updates the calendar and notifies the
+  prospect.
+
+Refresh tokens are encrypted at rest (AES-256-GCM, keyed from `AUTH_SECRET`).
+Rotating `AUTH_SECRET` invalidates them, and everyone reconnects — the safe
+failure. Every calendar call is best-effort: if Google is unreachable the
+booking still succeeds, it just does not appear in the diary.
+
 ### Paystack
 ```env
 PAYSTACK_MODE="live"
@@ -402,6 +430,7 @@ a TypeScript union rather than a Prisma enum. `npm run use:sqlite` switches back
 | Auth | Signed JWT session cookie, bcrypt, three roles |
 | Email | Nodemailer, with a preview mode that logs instead of sending |
 | Signing | DocuSign JWT grant + embedded signing, mock mode included |
+| Calendar | Google Calendar via OAuth — free/busy, events, Meet links |
 | Payments | Paystack, mock mode included |
 
 ### Where things live

@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { CheckCircle2, Mail, PlayCircle, RefreshCw, TriangleAlert } from 'lucide-react';
+import { CalendarDays, CheckCircle2, Mail, PlayCircle, RefreshCw, TriangleAlert } from 'lucide-react';
 import { Avatar } from '@/components/ui';
 import { Field, FormError, submitJson } from '@/components/forms';
 import { Modal } from '@/components/modal';
@@ -38,6 +38,7 @@ export function SettingsTabs({
   users,
   services,
   integrations,
+  google,
   job,
   emailCount,
   recentEmails,
@@ -68,6 +69,12 @@ export function SettingsTabs({
     docusign: { mode: string; configured: boolean };
     paystack: { mode: string; configured: boolean };
     email: { mode: string; configured: boolean };
+  };
+  google: {
+    configured: boolean;
+    connected: boolean;
+    email: string | null;
+    connectedAt: string | null;
   };
   job: { lastRunAt: string | null; lastRunAction: string | null; lastRunMeta: string | null };
   emailCount: number;
@@ -685,6 +692,7 @@ export function SettingsTabs({
       {/* --- Integrations --- */}
       {tab === 'Integrations' ? (
         <div className="max-w-2xl space-y-4">
+          <GoogleCalendarCard {...google} />
           <IntegrationCard
             title="DocuSign"
             purpose="Embedded e-signature for engagement letters."
@@ -823,6 +831,104 @@ function IntegrationCard({
           {configured ? 'Credentials are present — switch the mode to go live.' : 'No credentials configured yet.'}
         </p>
       ) : null}
+    </section>
+  );
+}
+
+/**
+ * Google Calendar is connected per person, not per firm: the lead's owner is
+ * whose calendar the discovery call belongs in, and whose free/busy decides
+ * which slots a prospect is offered.
+ */
+function GoogleCalendarCard({
+  configured,
+  connected,
+  email,
+  connectedAt,
+}: {
+  configured: boolean;
+  connected: boolean;
+  email: string | null;
+  connectedAt: string | null;
+}) {
+  const [busy, setBusy] = useState(false);
+  const router = useRouter();
+
+  async function disconnect() {
+    if (!confirm('Disconnect Google Calendar? Calls already in your diary stay there.')) return;
+    setBusy(true);
+    await submitJson('/api/google/disconnect', {});
+    setBusy(false);
+    router.refresh();
+  }
+
+  return (
+    <section className="card card-pad">
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <h2 className="text-sm font-semibold text-slate-900">Google Calendar</h2>
+          <p className="mt-0.5 text-xs text-slate-500">
+            Hides slots you are already busy for, and puts booked calls in your diary with a Meet
+            link.
+          </p>
+        </div>
+        <span
+          className={cn(
+            'badge shrink-0',
+            connected ? 'bg-emerald-100 text-emerald-800' : 'bg-slate-100 text-slate-600',
+          )}
+        >
+          {connected ? (
+            <CheckCircle2 className="h-3 w-3" aria-hidden />
+          ) : (
+            <CalendarDays className="h-3 w-3" aria-hidden />
+          )}
+          {connected ? 'Connected' : 'Not connected'}
+        </span>
+      </div>
+
+      {!configured ? (
+        <p className="mt-3 rounded-lg bg-amber-50 px-3 py-2 text-xs leading-relaxed text-amber-800">
+          Set <code className="font-mono">GOOGLE_CLIENT_ID</code> and{' '}
+          <code className="font-mono">GOOGLE_CLIENT_SECRET</code> to switch this on. Create an OAuth
+          client in the Google Cloud Console with{' '}
+          <code className="font-mono">{'<APP_URL>'}/api/google/callback</code> as the redirect URI.
+        </p>
+      ) : connected ? (
+        <>
+          <dl className="mt-3 space-y-1.5 rounded-lg bg-slate-50 p-3 text-xs">
+            <div className="flex justify-between">
+              <dt className="text-slate-500">Account</dt>
+              <dd className="font-medium text-slate-900">{email ?? 'connected'}</dd>
+            </div>
+            {connectedAt ? (
+              <div className="flex justify-between">
+                <dt className="text-slate-500">Connected</dt>
+                <dd className="font-medium text-slate-900">{formatDateTime(connectedAt)}</dd>
+              </div>
+            ) : null}
+          </dl>
+          <div className="mt-4 flex flex-wrap gap-2">
+            <a href="/api/google/connect" className="btn-secondary btn-sm">
+              Reconnect
+            </a>
+            <button type="button" className="btn-danger btn-sm" onClick={disconnect} disabled={busy}>
+              Disconnect
+            </button>
+          </div>
+        </>
+      ) : (
+        <>
+          <p className="mt-3 text-xs leading-relaxed text-slate-600">
+            Until you connect, the booking page only knows about calls made in this app — a prospect
+            could book over something already in your diary.
+          </p>
+          <a href="/api/google/connect" className="btn-primary btn-sm mt-4">
+            <CalendarDays className="h-3.5 w-3.5" aria-hidden />
+            Connect Google Calendar
+          </a>
+        </>
+      )}
     </section>
   );
 }

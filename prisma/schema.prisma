@@ -35,6 +35,17 @@ model User {
   createdAt    DateTime  @default(now())
   updatedAt    DateTime  @updatedAt
 
+  // --- Google Calendar (see src/lib/google-calendar.ts) ---
+  // Connected per person, because the lead's owner is whose calendar the
+  // discovery call belongs in. The refresh token is encrypted at rest by
+  // src/lib/secrets.ts and never leaves the server.
+  googleRefreshToken String?
+  googleAccessToken  String?
+  googleTokenExpiry  DateTime?
+  googleEmail        String?
+  googleCalendarId   String?   @default("primary")
+  googleConnectedAt  DateTime?
+
   ownedLeads          Lead[]                  @relation("LeadOwner")
   ownedClients        Client[]                @relation("ClientOwner")
   ownedOnboardings    Onboarding[]            @relation("OnboardingOwner")
@@ -105,21 +116,25 @@ model LeadActivity {
 }
 
 model DiscoveryBooking {
-  id            String    @id @default(cuid())
-  leadId        String
-  scheduledAt   DateTime
-  durationMins  Int       @default(30)
-  meetingLink   String?
-  location      String?
-  status        String    @default("CONFIRMED") // CONFIRMED | COMPLETED | CANCELLED | NO_SHOW
-  bookedByName  String?
-  bookedByEmail String?
-  agenda        String?
-  outcomeNotes  String?
-  outcome       String? // PROCEED | NOT_A_FIT | FOLLOW_UP
-  completedAt   DateTime?
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
+  id               String    @id @default(cuid())
+  leadId           String
+  scheduledAt      DateTime
+  durationMins     Int       @default(30)
+  meetingLink      String?
+  location         String?
+  status           String    @default("CONFIRMED") // CONFIRMED | COMPLETED | CANCELLED | NO_SHOW
+  bookedByName     String?
+  bookedByEmail    String?
+  agenda           String?
+  outcomeNotes     String?
+  outcome          String? // PROCEED | NOT_A_FIT | FOLLOW_UP
+  completedAt      DateTime?
+  // Google Calendar event backing this booking, when a calendar is connected.
+  googleEventId    String?
+  googleCalendarId String?
+  googleHtmlLink   String?
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
 
   lead  Lead   @relation(fields: [leadId], references: [id], onDelete: Cascade)
   tasks Task[]

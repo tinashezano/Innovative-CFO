@@ -5,6 +5,7 @@ import { PageHeader } from '@/components/ui';
 import { SettingsTabs } from './settings-tabs';
 import { docusignMode, docusignConfigured } from '@/lib/docusign';
 import { paystackMode, paystackConfigured } from '@/lib/paystack';
+import { googleConfigured, googleConnectionFor } from '@/lib/google-calendar';
 import { canManage } from '@/lib/auth';
 import type { Role } from '@/lib/constants';
 
@@ -13,6 +14,7 @@ export const dynamic = 'force-dynamic';
 export default async function SettingsPage() {
   const user = await requirePageUser();
   const settings = await getSettings();
+  const google = await googleConnectionFor(user.id);
 
   const [users, services, lastRun, emailCount, recentEmails] = await Promise.all([
     prisma.user.findMany({
@@ -66,6 +68,12 @@ export default async function SettingsPage() {
             mode: process.env.EMAIL_MODE === 'smtp' ? 'smtp' : 'preview',
             configured: Boolean(process.env.SMTP_HOST),
           },
+        }}
+        google={{
+          configured: googleConfigured(),
+          connected: google.connected,
+          email: google.email,
+          connectedAt: google.connectedAt?.toISOString() ?? null,
         }}
         job={{
           lastRunAt: lastRun?.createdAt.toISOString() ?? null,

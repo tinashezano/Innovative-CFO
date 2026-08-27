@@ -3,6 +3,7 @@ import { notFound } from 'next/navigation';
 import { ArrowLeft, Mail, Phone } from 'lucide-react';
 import { prisma } from '@/lib/db';
 import { requirePageUser } from '@/lib/auth';
+import { googleConfigured, googleConnectionFor } from '@/lib/google-calendar';
 import { appUrl, formatDate, formatMoney } from '@/lib/utils';
 import { Avatar, LeadStageBadge, PageHeader, ProposalStatusBadge } from '@/components/ui';
 import { LeadStageControl } from './stage-control';
@@ -33,6 +34,13 @@ export default async function LeadDetailPage({ params }: { params: Promise<{ id:
   });
 
   if (!lead) notFound();
+
+  // Whether the booking link is checking a real calendar, or only this app's
+  // own bookings. Worth saying plainly on the lead rather than leaving someone
+  // to wonder why a prospect double-booked them.
+  const calendar = lead.ownerId
+    ? await googleConnectionFor(lead.ownerId)
+    : { connected: false, email: null, connectedAt: null, calendarId: 'primary' };
 
   const bookingUrl = appUrl(`/book/${lead.bookingToken}`);
   const openBooking = lead.bookings.find((b) => b.status === 'CONFIRMED');
@@ -189,6 +197,30 @@ export default async function LeadDetailPage({ params }: { params: Promise<{ id:
               raises the call task automatically.
             </p>
             <CopyLink url={bookingUrl} />
+
+            {googleConfigured() ? (
+              <p
+                className={`mt-3 rounded-lg px-3 py-2 text-xs ${
+                  calendar.connected ? 'bg-emerald-50 text-emerald-800' : 'bg-amber-50 text-amber-800'
+                }`}
+              >
+                {calendar.connected ? (
+                  <>
+                    Slots are checked against {calendar.email ?? "the owner's"} Google Calendar, and
+                    a booking lands there with a Meet link.
+                  </>
+                ) : (
+                  <>
+                    {lead.owner?.name ?? 'The owner'} has not connected Google Calendar, so slots
+                    only avoid calls booked in this app.{' '}
+                    <Link href="/settings" className="font-semibold underline">
+                      Connect it
+                    </Link>
+                    .
+                  </>
+                )}
+              </p>
+            ) : null}
           </section>
 
           {lead.notes ? (

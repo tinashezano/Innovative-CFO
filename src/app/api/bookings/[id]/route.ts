@@ -3,6 +3,7 @@ import { prisma } from '@/lib/db';
 import { requireUser } from '@/lib/auth';
 import { handler, ok, toDate } from '@/lib/api';
 import { BOOKING_STATUSES } from '@/lib/constants';
+import { cancelCalendarEvent, rescheduleCalendarEvent } from '@/lib/google-calendar';
 
 const schema = z.object({
   scheduledAt: z.string().optional(),
@@ -34,6 +35,33 @@ export const PATCH = handler(async (request: Request, ctx: { params: Promise<{ i
       where: { bookingId: id, status: { not: 'DONE' } },
       data: { startDate: scheduledAt, dueDate: scheduledAt },
     });
+  }
+
+  // Keep Google Calendar in step, so the prospect's diary matches ours. Both
+  // calls are best-effort: a calendar failure must not undo the change here.
+  if (booking.googleEventId) {
+    const lead = await prisma.lead.findUnique({
+      where: { id: booking.leadId },
+      select: { ownerId: true },
+    });
+
+    if (lead?.ownerId) {
+      if (input.status === 'CANCELLED') {
+        await cancelCalendarEvent({
+          userId: lead.ownerId,
+          eventId: booking.googleEventId,
+          calendarId: booking.googleCalendarId,
+        });
+      } else if (scheduledAt) {
+        await rescheduleCalendarEvent({
+          userId: lead.ownerId,
+          eventId: booking.googleEventId,
+          calendarId: booking.googleCalendarId,
+          start: scheduledAt,
+          durationMins: booking.durationMins,
+        });
+      }
+    }
   }
 
   return ok({ booking });

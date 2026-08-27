@@ -15,6 +15,7 @@ import {
 } from './email-templates';
 import { renderEngagementLetter } from './documents';
 import { createEnvelope } from './docusign';
+import { createCalendarEvent } from './google-calendar';
 import { buildReference, initializeTransaction } from './paystack';
 import { createTask } from './tasks';
 import { audit, notify, notifyManagers } from './notify';
@@ -208,11 +209,13 @@ export async function confirmBooking(input: {
   const lead = await prisma.lead.findUnique({ where: { id: input.leadId }, include: { owner: true } });
   if (!lead) throw new Error('Lead not found');
 
+  const durationMins = input.durationMins ?? settings.discoveryDurationMins;
+
   const booking = await prisma.discoveryBooking.create({
     data: {
       leadId: lead.id,
       scheduledAt: input.scheduledAt,
-      durationMins: input.durationMins ?? settings.discoveryDurationMins,
+      durationMins,
       meetingLink: input.meetingLink ?? null,
       agenda: input.agenda ?? null,
       bookedByName: input.bookedByName ?? lead.contactName,
@@ -220,6 +223,41 @@ export async function confirmBooking(input: {
       status: 'CONFIRMED',
     },
   });
+
+  // Put it in the owner's Google Calendar and invite the prospect. Returns null
+  // when no calendar is connected, and never throws — a calendar problem must
+  // not cost us the booking itself.
+  if (lead.ownerId) {
+    const event = await createCalendarEvent({
+      userId: lead.ownerId,
+      summary: `Discovery call: ${lead.companyName}`,
+      description: [
+        `Discovery call with ${lead.contactName} (${lead.email}${lead.phone ? `, ${lead.phone}` : ''}).`,
+        input.agenda ? `\nWhat they want to discuss:\n${input.agenda}` : '',
+        `\nLead: ${appUrl(`/leads/${lead.id}`)}`,
+      ]
+        .join('')
+        .trim(),
+      start: input.scheduledAt,
+      durationMins,
+      attendeeEmail: input.bookedByEmail ?? lead.email,
+      attendeeName: input.bookedByName ?? lead.contactName,
+    });
+
+    if (event) {
+      await prisma.discoveryBooking.update({
+        where: { id: booking.id },
+        data: {
+          googleEventId: event.eventId,
+          googleCalendarId: event.calendarId,
+          googleHtmlLink: event.htmlLink,
+          // A Meet link Google generated beats one nobody supplied.
+          ...(event.meetLink && !booking.meetingLink ? { meetingLink: event.meetLink } : {}),
+        },
+      });
+      if (event.meetLink && !booking.meetingLink) booking.meetingLink = event.meetLink;
+    }
+  }
 
   if (lead.stage === 'NEW') await setLeadStage(lead.id, 'DISCOVERY');
 
