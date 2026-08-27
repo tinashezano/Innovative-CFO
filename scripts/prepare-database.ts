@@ -23,12 +23,13 @@ if (!url) {
   process.exit(0);
 }
 
-if (providerForUrl(url) === 'sqlite') {
-  console.log('[database] local SQLite — skipping (use npm run setup)');
-  process.exit(0);
-}
-
-console.log(`[database] ensuring tables exist (from ${source})`);
+// Every provider gets its tables, SQLite included. Treating a file: URL as
+// "must be a developer's laptop" was wrong: hosts like Railway run SQLite on a
+// container disk, and skipping there left a deployment with no tables at all.
+// `db push` against an already-current database is a no-op, so running it here
+// is safe locally too.
+const provider = providerForUrl(url);
+console.log(`[database] ensuring ${provider} tables exist (from ${source})`);
 
 try {
   execFileSync('npx', ['prisma', 'db', 'push', '--skip-generate'], {

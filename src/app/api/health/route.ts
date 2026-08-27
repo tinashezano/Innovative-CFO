@@ -67,11 +67,19 @@ export async function GET() {
       fix: 'Add DATABASE_URL pointing at your database, or attach a Postgres store, then redeploy.',
     });
   } else if (url.startsWith('file:')) {
+    // Fine locally. On a deployment the container disk is wiped on every
+    // redeploy, so this silently loses every client, task and proposal —
+    // report it as a problem rather than something merely worth knowing.
+    const deployed = process.env.NODE_ENV === 'production';
     checks.push({
       name: 'DATABASE_URL',
-      ok: true,
-      detail: 'SQLite (file-backed)',
-      fix: 'On a serverless host the filesystem is not durable — use Postgres for anything you want to keep.',
+      ok: !deployed,
+      detail: deployed
+        ? 'SQLite on the container disk — everything is erased on each redeploy'
+        : 'SQLite (file-backed) — fine for local development',
+      fix: deployed
+        ? 'Add a Postgres database on your host and point DATABASE_URL at it, or mount a persistent volume.'
+        : undefined,
     });
   } else {
     checks.push({ name: 'DATABASE_URL', ok: true, detail: `${scheme} connection configured${via}` });
